@@ -1,0 +1,25 @@
+{
+  "bundle_version": 1,
+  "title": "OAuth2 Authentication",
+  "created_at": "2026-04-10T09:00:00.000Z",
+  "source_request": "Add OAuth2 authentication to the existing Express.js API. Support Google and GitHub providers. Store sessions in PostgreSQL.",
+  "project_paths": { "root": "/example/project" },
+  "stages": {
+    "preprocess": {
+      "ambiguity_points": ["Session storage strategy unclear", "Token refresh policy not specified"],
+      "reframed_goal": "Add OAuth2 login with Google and GitHub to Express.js API, storing sessions in existing PostgreSQL database",
+      "retained_scope": ["OAuth2 code flow for Google and GitHub", "Session persistence in PostgreSQL", "JWT token issuance"],
+      "excluded_scope": ["Email/password auth", "SAML/LDAP", "Mobile deep linking"],
+      "critical_assumptions": ["PostgreSQL is already running and accessible", "Express.js app uses standard middleware pattern"],
+      "frozen_for_code": ["passport.js as OAuth library", "express-session with connect-pg-simple for session store"]
+    },
+    "divergence": null,
+    "requirements": null,
+    "critique": null,
+    "closure": null,
+    "probes": null,
+    "red_blue": null,
+    "review": null,
+    "compile_for_code": null
+  }
+}

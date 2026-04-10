@@ -1,0 +1,1 @@
+Add OAuth2 authentication to the existing Express.js API. Support Google and GitHub providers. Store sessions in PostgreSQL.
