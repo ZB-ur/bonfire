@@ -1,0 +1,10 @@
+{
+  "name": "bonfire",
+  "description": "Cybernetics-based development pipeline for Claude Code. Constraint-led planning, adversarial review, frozen handoff, acceptance-driven closure.",
+  "version": "0.1.0",
+  "author": {
+    "name": "ZB-ur"
+  },
+  "license": "MIT",
+  "keywords": ["cybernetics", "planning", "adversarial", "constraint", "pipeline"]
+}
