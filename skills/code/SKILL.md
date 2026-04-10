@@ -12,8 +12,10 @@ Core invariant: if the coder needs to ask what the product means, reenter `/bonf
 
 <execution_context>
 Read these references before starting:
-- @references/code-playbook.md
-- @references/ecl-schema.md
+- @$HOME/.claude/bonfire/references/code-playbook.md
+- @$HOME/.claude/bonfire/references/ecl-schema.md
+
+Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire-tools.cjs`.
 </execution_context>
 
 <process>
@@ -31,8 +33,8 @@ Read these references before starting:
 
 3. Initialize code steps:
    ```
-   bonfire-tools.cjs state-init-code-steps
-   bonfire-tools.cjs state-begin-run --run-id run-<timestamp>
+   bonfire state-init-code-steps
+   bonfire state-begin-run --run-id run-<timestamp>
    ```
 
 ## Unit Execution Loop
@@ -44,7 +46,7 @@ For each unit in `handoff.implementation_units` (dependency order from execution
 5. **Loop start:**
    ```
    iteration += 1
-   bonfire-tools.cjs state-step --step unit-N --status running
+   bonfire state-step --step unit-N --status running
    ```
 
 6. Spawn bonfire-coder:
@@ -55,7 +57,7 @@ For each unit in `handoff.implementation_units` (dependency order from execution
               Handoff: @.bonfire/plan/compile-output.json#handoff
               Preflight: @.bonfire/plan/compile-output.json#code_preflight
               Feedback: <previous evaluator issues or null>
-              @references/code-playbook.md"
+              @$HOME/.claude/bonfire/references/code-playbook.md"
    })
    ```
 
@@ -69,7 +71,7 @@ For each unit in `handoff.implementation_units` (dependency order from execution
               Manifest: @.bonfire/runs/<run-id>/unit-N-manifest.json
               Frozen decisions: @.bonfire/plan/compile-output.json#handoff.frozen_product_decisions
               Snapshot: @.bonfire/truth-surface/constraint-ledger-snapshot.json
-              @references/code-playbook.md"
+              @$HOME/.claude/bonfire/references/code-playbook.md"
    })
    ```
 
@@ -109,7 +111,7 @@ For each unit in `handoff.implementation_units` (dependency order from execution
     - Run `browser_checks` if applicable
     - Write `runs/<run-id>/code-run.json`
     - `state-complete-run --run-id <id> --verdict pending_achieve`
-    - Render: `bonfire-tools.cjs render --run <run-id> --note code-run`
+    - Render: `bonfire render --run <run-id> --note code-run`
     - Output: **"/code complete. Please execute /bonfire:achieve"**
 
 </process>

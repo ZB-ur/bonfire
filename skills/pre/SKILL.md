@@ -10,12 +10,12 @@ Own Stage A of the bonfire pipeline. Turn a raw user request into an approved, f
 
 <execution_context>
 Read these references before starting:
-- @references/approval-gate.md
-- @references/stage-playbook.md
-- @references/diagnosis-and-observability.md (only for bug/diagnosis requests)
-- @references/ecl-schema.md
+- @$HOME/.claude/bonfire/references/approval-gate.md
+- @$HOME/.claude/bonfire/references/stage-playbook.md
+- @$HOME/.claude/bonfire/references/diagnosis-and-observability.md (only for bug/diagnosis requests)
+- @$HOME/.claude/bonfire/references/ecl-schema.md
 
-CLI tool: `bonfire-tools.cjs` (all commands documented in ecl-schema reference)
+Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire-tools.cjs`.
 </execution_context>
 
 <process>
@@ -23,18 +23,18 @@ CLI tool: `bonfire-tools.cjs` (all commands documented in ecl-schema reference)
 ## Startup
 
 1. Check for pending_reentry in state.json:
-   - If `pending_reentry.target_pipeline == "pre"`: execute `bonfire-tools.cjs state-reentry --conflict-type <type>`, then `bonfire-tools.cjs state-clear-reentry`. Resume from stage-a.
+   - If `pending_reentry.target_pipeline == "pre"`: execute `bonfire state-reentry --conflict-type <type>`, then `bonfire state-clear-reentry`. Resume from stage-a.
    - If `pending_reentry` exists but targets a different pipeline: abort with "pending reentry target is /bonfire:<target>".
    - If no pending_reentry: proceed normally.
 
 2. If this is a new case (no `.bonfire/state.json`):
    ```
-   bonfire-tools.cjs init --request "<user request>" --project-root <path>
+   bonfire init --request "<user request>" --project-root <path>
    ```
 
 3. Set step status:
    ```
-   bonfire-tools.cjs state-step --step stage-a --status running
+   bonfire state-step --step stage-a --status running
    ```
 
 ## Parent Initial Review
@@ -68,7 +68,7 @@ CLI tool: `bonfire-tools.cjs` (all commands documented in ecl-schema reference)
 
 10. Set step status:
     ```
-    bonfire-tools.cjs state-step --step stage-a --status awaiting_user
+    bonfire state-step --step stage-a --status awaiting_user
     ```
 
 11. Ask clarification questions one at a time. Cover:
@@ -92,7 +92,7 @@ CLI tool: `bonfire-tools.cjs` (all commands documented in ecl-schema reference)
     - `frozen_for_code`
     - Plus all preprocess fields (ambiguity_points, dubious_claims, etc.)
 
-15. Render: `bonfire-tools.cjs render --note stage-a`
+15. Render: `bonfire render --note stage-a`
 
 16. Present approval pack to user. Wait for explicit approval.
 
@@ -101,9 +101,9 @@ CLI tool: `bonfire-tools.cjs` (all commands documented in ecl-schema reference)
 17. If user approves:
     - `truth-freeze` all `confirmed_fact` entries
     - `truth-propose` remaining `retained_goal` and `acceptance_semantic` entries
-    - `bonfire-tools.cjs state-step --step stage-a --status passed`
-    - `bonfire-tools.cjs state-advance --step stage-a`
-    - `bonfire-tools.cjs render --note overview`
+    - `bonfire state-step --step stage-a --status passed`
+    - `bonfire state-advance --step stage-a`
+    - `bonfire render --note overview`
     - Output: **"Stage A passed. Please execute /bonfire:plan"**
 
 18. If user rejects: return to step 11 (user interaction loop).

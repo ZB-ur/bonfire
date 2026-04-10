@@ -10,8 +10,10 @@ Determine whether the delivered result satisfies the frozen acceptance meaning f
 
 <execution_context>
 Read these references before starting:
-- @references/achieve-playbook.md
-- @references/ecl-schema.md
+- @$HOME/.claude/bonfire/references/achieve-playbook.md
+- @$HOME/.claude/bonfire/references/ecl-schema.md
+
+Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire-tools.cjs`.
 </execution_context>
 
 <process>
@@ -27,7 +29,7 @@ Read these references before starting:
 ## Step 1: Bundle Integrity
 
 3. ```
-   bonfire-tools.cjs bundle-validate
+   bonfire bundle-validate
    ```
    - Pass → continue
    - Fail → abort with validation errors
@@ -40,12 +42,12 @@ Read these references before starting:
 
 5. Write `runs/<run-id>/verification.json` with verification summary.
    ```
-   bonfire-tools.cjs render --run <run-id> --note verification
+   bonfire render --run <run-id> --note verification
    ```
 
 ## Step 3: Acceptance Verdict
 
-6. `bonfire-tools.cjs state-step --step accept --status awaiting_user`
+6. `bonfire state-step --step accept --status awaiting_user`
 
 7. Present to user:
    - List each `acceptance_check` from handoff, one by one
@@ -70,21 +72,21 @@ Read these references before starting:
    ```
 
 10. ```
-    bonfire-tools.cjs render --run <run-id> --note achieve
+    bonfire render --run <run-id> --note achieve
     ```
 
 ## Step 4: Archive Decision
 
 11. **achieved or achieved_with_followups:**
     ```
-    bonfire-tools.cjs state-step --step accept --status passed
-    bonfire-tools.cjs archive --name <date>-<title>
+    bonfire state-step --step accept --status passed
+    bonfire archive --name <date>-<title>
     ```
     Output: **"Case archived: .bonfire/archive/<name>/. Acceptance recorded."**
 
 12. **not_achieved:**
     ```
-    bonfire-tools.cjs state-step --step accept --status gate_failed
+    bonfire state-step --step accept --status gate_failed
     ```
     Output: "Acceptance failed. Case stays active. Options:
     - Re-execute `/bonfire:code` for a new run
