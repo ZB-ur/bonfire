@@ -7,4 +7,4 @@
 
 ## Project Paths
 
-Root: {{project_paths}}
+Root: {{project_root}}

@@ -156,12 +156,26 @@ function preprocessConstraintLedger(data) {
 }
 
 /**
+ * Preprocess data for overview note.
+ * Extracts project_paths.root into a flat string field.
+ */
+function preprocessOverview(data) {
+  if (!data) return data;
+  const root = data.project_paths && data.project_paths.root
+    ? data.project_paths.root
+    : JSON.stringify(data.project_paths);
+  return Object.assign({}, data, { project_root: root });
+}
+
+/**
  * Dispatch to the right preprocessor for a given note id.
  */
 function preprocessData(noteId, data) {
   switch (noteId) {
     case 'constraint-ledger':
       return preprocessConstraintLedger(data);
+    case 'overview':
+      return preprocessOverview(data);
     default:
       return data;
   }
