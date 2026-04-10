@@ -112,6 +112,20 @@ When evaluator returns a conflict_type that routes to a plan stage:
 3. Skill terminates: "Constraint violated (<type>). Need /bonfire:plan"
 4. User executes `/bonfire:plan`, which reads pending_reentry and resumes
 
+Complete conflict_type → stage mapping (from `bonfire-v1.json` route table):
+
+| conflict_type | Target Stage | Crosses Pipeline |
+|---------------|-------------|-----------------|
+| `goal_conflict` | stage-a | yes (resets to /bonfire:pre) |
+| `scope_conflict` | stage-b | no |
+| `requirement_conflict` | stage-c | no |
+| `critique_gap` | stage-d | no |
+| `dependency_gap` | stage-e | no |
+| `probe_invalidated` | stage-f | no |
+| `adversarial_unresolved` | stage-g | no |
+| `handoff_incomplete` | stage-h | no |
+| `handoff_contradiction` | stage-j | no |
+
 ## Completion
 
 When all units pass:
