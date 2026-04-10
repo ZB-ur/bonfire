@@ -147,10 +147,8 @@ function stateAdvance(args) {
       }
     }
 
-    // Set current_step to first step of next pipeline
-    if (nextSteps.length > 0) {
-      state.current_step = nextSteps[0];
-    }
+    // Set current_step to first step of next pipeline, or null if dynamic
+    state.current_step = nextSteps.length > 0 ? nextSteps[0] : null;
 
     saveState(root, state);
     exitJSON({ success: true, advanced_to_pipeline: nextPipeline, current_step: state.current_step });

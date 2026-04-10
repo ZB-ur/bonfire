@@ -24,7 +24,7 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
 
 1. Read state.json:
    - If `pending_reentry` exists: abort with "pending reentry to /bonfire:<target>. Please resolve first."
-   - Verify `pipeline_stage == "plan"` and `stage-j.status == "passed"`
+   - Verify `pipeline_stage == "code"` and `stage-j.status == "passed"`
    - Otherwise abort: "Please complete /bonfire:plan first"
 
 2. Read `.bonfire/plan/compile-output.json`:

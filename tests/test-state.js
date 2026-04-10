@@ -133,3 +133,25 @@ test('state-complete-run records completed run', () => {
   assert.equal(state.runs.completed_runs[0].verdict, 'achieved');
   fs.rmSync(dir, { recursive: true });
 });
+
+test('state-advance from last plan step moves to code pipeline with null current_step', () => {
+  const dir = makeTmpDir();
+  initCase(dir);
+  // Advance from pre to plan
+  execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { cwd: dir });
+  execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { cwd: dir });
+  // Mark all plan steps as passed
+  for (const step of ['stage-b','stage-c','stage-d','stage-e','stage-f','stage-g','stage-h','stage-j']) {
+    execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { cwd: dir });
+  }
+  // Advance from stage-j (last step in plan) → should move to code pipeline
+  const stdout = execFileSync('node', [CLI, 'state-advance', '--step', 'stage-j'], { encoding: 'utf8', cwd: dir });
+  const result = JSON.parse(stdout);
+  assert.equal(result.advanced_to_pipeline, 'code');
+
+  const state = readState(dir);
+  assert.equal(state.pipeline_stage, 'code');
+  assert.equal(state.current_step, null);
+  assert.equal(state.steps['stage-j'].status, 'passed');
+  fs.rmSync(dir, { recursive: true });
+});
