@@ -240,6 +240,16 @@ function replay(root) {
 function regenerateSnapshot(root) {
   const snapshot = replay(root);
   writeAtomic(getSnapshotPath(root), snapshot);
+
+  // Self-render: truth surface changes go through CLI (fs.writeFileSync),
+  // not Claude Code Write tool, so the dual-write hook can't see them.
+  try {
+    const { renderNote } = require('./renderer.cjs');
+    renderNote(root, 'constraint-ledger');
+  } catch (_) {
+    // Renderer may not be available during init or if templates missing
+  }
+
   return snapshot;
 }
 

@@ -117,6 +117,7 @@ function preflightCommand(args) {
     if (!co.code_preflight.progress_snapshot) co.code_preflight.progress_snapshot = {};
     co.code_preflight.progress_snapshot[args.unit] = args.status || 'in_progress';
     writeAtomic(coPath, co);
+    try { const { renderNote } = require('./lib/renderer.cjs'); renderNote(path.dirname(root), 'code-preflight'); } catch (_) {}
     exitJSON({ success: true, field: 'progress_snapshot', unit: args.unit, status: args.status });
     return;
   }
@@ -129,6 +130,7 @@ function preflightCommand(args) {
   if (!co.code_preflight) co.code_preflight = {};
   co.code_preflight[field] = args.value;
   writeAtomic(coPath, co);
+  try { const { renderNote } = require('./lib/renderer.cjs'); renderNote(path.dirname(root), 'code-preflight'); } catch (_) {}
   exitJSON({ success: true, field, value: args.value });
 }
 
