@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "notes": [
+    {
+      "id": "overview",
+      "filename": "00-overview.md",
+      "template": "overview.md",
+      "source": "case.json",
+      "requires": []
+    },
+    {
+      "id": "constraint-ledger",
+      "filename": "05-constraint-ledger.md",
+      "template": "constraint-ledger.md",
+      "source": "truth-surface/constraint-ledger-snapshot.json",
+      "requires": []
+    },
+    {
+      "id": "stage-a",
+      "filename": "10-a-preprocess.md",
+      "template": "stage-a.md",
+      "source": "case.json#stages.preprocess",
+      "requires": []
+    },
+    {
+      "id": "stage-b",
+      "filename": "20-b-divergence.md",
+      "template": "stage-b.md",
+      "source": "case.json#stages.divergence",
+      "requires": ["stage-a"]
+    },
+    {
+      "id": "stage-c",
+      "filename": "30-c-requirements.md",
+      "template": "stage-c.md",
+      "source": "case.json#stages.requirements",
+      "requires": ["stage-b"]
+    },
+    {
+      "id": "stage-d",
+      "filename": "40-d-critique.md",
+      "template": "stage-d.md",
+      "source": "plan/bonfire-d-critique-delta.json",
+      "requires": ["stage-c"]
+    },
+    {
+      "id": "stage-e",
+      "filename": "50-e-closure.md",
+      "template": "stage-e.md",
+      "source": "case.json#stages.closure",
+      "requires": ["stage-d"]
+    },
+    {
+      "id": "stage-f",
+      "filename": "60-f-probes.md",
+      "template": "stage-f.md",
+      "source": "case.json#stages.probes",
+      "requires": ["stage-e"]
+    },
+    {
+      "id": "stage-g",
+      "filename": "70-g-red-blue.md",
+      "template": "stage-g.md",
+      "source": "plan/bonfire-g-red-delta.json+plan/bonfire-g-blue-delta.json",
+      "requires": ["stage-f"]
+    },
+    {
+      "id": "stage-h",
+      "filename": "80-h-review.md",
+      "template": "stage-h.md",
+      "source": "plan/h-review-verdict.json",
+      "requires": ["stage-g"]
+    },
+    {
+      "id": "code-handoff",
+      "filename": "90-code-handoff.md",
+      "template": "code-handoff.md",
+      "source": "plan/compile-output.json#handoff",
+      "requires": ["stage-h"]
+    },
+    {
+      "id": "canonical-contracts",
+      "filename": "91-canonical-contracts.md",
+      "template": "canonical-contracts.md",
+      "source": "plan/compile-output.json#canonical_contracts",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "constraint-crosswalk",
+      "filename": "92-constraint-crosswalk.md",
+      "template": "constraint-crosswalk.md",
+      "source": "plan/compile-output.json#constraint_crosswalk",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "execution-manifest",
+      "filename": "95-execution-manifest.md",
+      "template": "execution-manifest.md",
+      "source": "plan/compile-output.json#execution_manifest",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "code-batches",
+      "filename": "96-code-batches.md",
+      "template": "code-batches.md",
+      "source": "plan/compile-output.json#code_batches",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "code-preflight",
+      "filename": "97-code-preflight.md",
+      "template": "code-preflight.md",
+      "source": "plan/compile-output.json#code_preflight",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "compile-for-code",
+      "filename": "98-j-compile-for-code.md",
+      "template": "stage-j.md",
+      "source": "plan/compile-output.json#compile_summary",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "final-handoff",
+      "filename": "99-final-handoff.md",
+      "template": "final-handoff.md",
+      "source": "plan/compile-output.json#final_handoff",
+      "requires": ["code-handoff"]
+    },
+    {
+      "id": "code-run",
+      "filename": "00-code-run.md",
+      "template": "code-run.md",
+      "source": "runs/{run_id}/code-run.json",
+      "output_dir": "runs/{run_id}/",
+      "requires": []
+    },
+    {
+      "id": "verification",
+      "filename": "01-verification.md",
+      "template": "verification.md",
+      "source": "runs/{run_id}/verification.json",
+      "output_dir": "runs/{run_id}/",
+      "requires": []
+    },
+    {
+      "id": "reentry",
+      "filename": "02-reentry.md",
+      "template": "reentry.md",
+      "source": "runs/{run_id}/reentry.json",
+      "output_dir": "runs/{run_id}/",
+      "requires": []
+    },
+    {
+      "id": "achieve",
+      "filename": "03-achieve.md",
+      "template": "achieve.md",
+      "source": "runs/{run_id}/achieve.json",
+      "output_dir": "runs/{run_id}/",
+      "requires": []
+    }
+  ],
+  "reentry_routes": {
+    "goal_conflict":          { "to": "stage-a", "crosses_pipeline": true },
+    "scope_conflict":         { "to": "stage-b", "crosses_pipeline": false },
+    "requirement_conflict":   { "to": "stage-c", "crosses_pipeline": false },
+    "critique_gap":           { "to": "stage-d", "crosses_pipeline": false },
+    "dependency_gap":         { "to": "stage-e", "crosses_pipeline": false },
+    "probe_invalidated":      { "to": "stage-f", "crosses_pipeline": false },
+    "adversarial_unresolved": { "to": "stage-g", "crosses_pipeline": false },
+    "handoff_incomplete":     { "to": "stage-h", "crosses_pipeline": false },
+    "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false }
+  },
+  "categories": {
+    "retained_goal": {
+      "can_freeze": true,
+      "maturity_gate": "challenged_by_non_empty",
+      "terminal_status": null
+    },
+    "confirmed_fact": {
+      "can_freeze": true,
+      "maturity_gate": "evidence_required",
+      "terminal_status": null
+    },
+    "frozen_constraint": {
+      "can_freeze": true,
+      "maturity_gate": "challenged_by_non_empty",
+      "terminal_status": null
+    },
+    "challenged_claim": {
+      "can_freeze": false,
+      "maturity_gate": null,
+      "terminal_status": null,
+      "note": "stays CHALLENGED until resolved, then reclassified"
+    },
+    "discarded_option": {
+      "can_freeze": false,
+      "maturity_gate": "rationale_non_empty",
+      "terminal_status": "discarded"
+    },
+    "high_impact_risk": {
+      "can_freeze": false,
+      "maturity_gate": null,
+      "terminal_status": "open",
+      "note": "never freezes, stays OPEN permanently"
+    },
+    "dependency_chain": {
+      "can_freeze": true,
+      "maturity_gate": "refs_valid",
+      "terminal_status": null
+    },
+    "acceptance_semantic": {
+      "can_freeze": true,
+      "maturity_gate": "challenged_by_non_empty",
+      "terminal_status": null
+    }
+  },
+  "delta_schemas": {
+    "bonfire-d-critique": {
+      "required_fields": ["agent", "challenges"],
+      "optional_fields": ["proposals", "alignments", "follow_up_questions"],
+      "constraints": { "challenges_min_length": 1 }
+    },
+    "bonfire-g-red": {
+      "required_fields": ["agent", "challenges"],
+      "optional_fields": ["proposals", "follow_up_questions"],
+      "constraints": { "challenges_min_length": 1 }
+    },
+    "bonfire-g-blue": {
+      "required_fields": ["agent", "alignments"],
+      "optional_fields": ["proposals", "follow_up_questions"],
+      "constraints": { "alignments_min_length": 1 }
+    },
+    "bonfire-h-review": {
+      "required_fields": ["verdict", "reason"],
+      "optional_fields": ["conflict_type", "conditions", "rulings"],
+      "constraints": {
+        "verdict_enum": ["approved", "approved_with_conditions", "rejected"],
+        "conflict_type_required_when_rejected": true
+      }
+    },
+    "bonfire-evaluator": {
+      "required_fields": ["unit", "iteration", "verdict", "verification_results"],
+      "optional_fields": ["issues", "algedonic", "conflict_type", "contradiction"],
+      "constraints": {
+        "verdict_enum": ["PASS", "FAIL"],
+        "conflict_type_from_reentry_routes": true
+      }
+    }
+  },
+  "annotate_whitelist": ["evidence_refs", "aligned_by", "notes"],
+  "preflight_mutable_fields": [
+    "current_focus",
+    "progress_snapshot",
+    "remaining_work",
+    "session_notes",
+    "blockers",
+    "pause_conditions"
+  ],
+  "step_order": {
+    "pre":     ["stage-a"],
+    "plan":    ["stage-b", "stage-c", "stage-d", "stage-e", "stage-f", "stage-g", "stage-h", "stage-j"],
+    "achieve": ["verify", "accept", "archive"]
+  },
+  "step_statuses": ["pending", "running", "awaiting_agent", "awaiting_user", "integrating", "gate_check", "passed", "gate_failed"]
+}
