@@ -52,3 +52,71 @@ test('CLI route with invalid conflict-type exits 1', () => {
     assert.ok(result.error);
   }
 });
+
+// Schema validation tests
+
+test('schema has exactly 22 notes', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.equal(schema.notes.length, 22);
+});
+
+test('schema notes have unique ids', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  const ids = schema.notes.map(n => n.id);
+  const unique = new Set(ids);
+  assert.equal(ids.length, unique.size, `Duplicate ids: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`);
+});
+
+test('schema notes have unique filenames', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  const filenames = schema.notes.map(n => n.filename);
+  const unique = new Set(filenames);
+  assert.equal(filenames.length, unique.size);
+});
+
+test('schema note requires reference valid ids', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  const ids = new Set(schema.notes.map(n => n.id));
+  for (const note of schema.notes) {
+    for (const req of (note.requires || [])) {
+      assert.ok(ids.has(req), `Note "${note.id}" requires unknown note "${req}"`);
+    }
+  }
+});
+
+test('schema has 9 reentry routes', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.equal(Object.keys(schema.reentry_routes).length, 9);
+});
+
+test('schema reentry route targets are valid steps', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  const allSteps = Object.values(schema.step_order).flat();
+  for (const [type, route] of Object.entries(schema.reentry_routes)) {
+    assert.ok(allSteps.includes(route.to), `Route "${type}" targets unknown step "${route.to}"`);
+  }
+});
+
+test('schema has 8 categories', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.equal(Object.keys(schema.categories).length, 8);
+});
+
+test('schema has 5 delta schemas', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.equal(Object.keys(schema.delta_schemas).length, 5);
+});
+
+test('schema preflight_mutable_fields has 6 entries', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.equal(schema.preflight_mutable_fields.length, 6);
+});
