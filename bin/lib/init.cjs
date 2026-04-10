@@ -14,7 +14,7 @@ function init(args) {
   }
 
   const bonfireDir = path.join(projectRoot, '.bonfire');
-  if (fs.existsSync(bonfireDir)) {
+  if (fs.existsSync(path.join(bonfireDir, 'state.json'))) {
     exitError('.bonfire/ already exists. Archive the current case first.', [bonfireDir]);
   }
 

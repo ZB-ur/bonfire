@@ -58,6 +58,7 @@ test('init creates .bonfire/ with correct structure', () => {
 test('init fails if .bonfire/ already exists', () => {
   const dir = makeTmpDir();
   fs.mkdirSync(path.join(dir, '.bonfire'));
+  fs.writeFileSync(path.join(dir, '.bonfire', 'state.json'), '{}');
   try {
     execFileSync('node', [CLI, 'init', '--request', 'test', '--project-root', dir], {
       encoding: 'utf8',
@@ -83,5 +84,61 @@ test('init fails without --request', () => {
   } catch (err) {
     assert.equal(err.status, 2);
   }
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('archive moves case to archive directory', () => {
+  const dir = makeTmpDir();
+  execFileSync('node', [CLI, 'init', '--request', 'test', '--project-root', dir], {
+    encoding: 'utf8', cwd: dir
+  });
+
+  fs.writeFileSync(path.join(dir, '.bonfire', 'plan', 'test-marker.json'), '{}');
+
+  const stdout = execFileSync('node', [CLI, 'archive', '--name', 'test-case'], {
+    encoding: 'utf8', cwd: dir
+  });
+  const result = JSON.parse(stdout);
+  assert.equal(result.success, true);
+
+  assert.ok(fs.existsSync(path.join(dir, '.bonfire', 'archive', 'test-case', 'state.json')));
+  assert.ok(fs.existsSync(path.join(dir, '.bonfire', 'archive', 'test-case', 'case.json')));
+  assert.ok(fs.existsSync(path.join(dir, '.bonfire', 'archive', 'test-case', 'plan', 'test-marker.json')));
+
+  assert.ok(!fs.existsSync(path.join(dir, '.bonfire', 'state.json')));
+  assert.ok(!fs.existsSync(path.join(dir, '.bonfire', 'case.json')));
+  assert.ok(fs.existsSync(path.join(dir, '.bonfire', 'plan')));
+  assert.deepStrictEqual(fs.readdirSync(path.join(dir, '.bonfire', 'plan')), []);
+
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('archive-list returns empty when no archives', () => {
+  const dir = makeTmpDir();
+  execFileSync('node', [CLI, 'init', '--request', 'test', '--project-root', dir], {
+    encoding: 'utf8', cwd: dir
+  });
+  const stdout = execFileSync('node', [CLI, 'archive-list'], { encoding: 'utf8', cwd: dir });
+  const result = JSON.parse(stdout);
+  assert.deepStrictEqual(result.archives, []);
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('archive-list returns archived cases sorted', () => {
+  const dir = makeTmpDir();
+
+  execFileSync('node', [CLI, 'init', '--request', 'first', '--project-root', dir], {
+    encoding: 'utf8', cwd: dir
+  });
+  execFileSync('node', [CLI, 'archive', '--name', 'beta-case'], { encoding: 'utf8', cwd: dir });
+  execFileSync('node', [CLI, 'init', '--request', 'second', '--project-root', dir], {
+    encoding: 'utf8', cwd: dir
+  });
+  execFileSync('node', [CLI, 'archive', '--name', 'alpha-case'], { encoding: 'utf8', cwd: dir });
+
+  const stdout = execFileSync('node', [CLI, 'archive-list'], { encoding: 'utf8', cwd: dir });
+  const result = JSON.parse(stdout);
+  assert.deepStrictEqual(result.archives, ['alpha-case', 'beta-case']);
+
   fs.rmSync(dir, { recursive: true });
 });
