@@ -18,28 +18,90 @@ const COMMANDS = {
   'state-begin-run':  () => require('./lib/state.cjs').stateBeginRun,
   'state-complete-run': () => require('./lib/state.cjs').stateCompleteRun,
   'state-init-code-steps': () => require('./lib/state.cjs').stateInitCodeSteps,
-  'truth-propose':    () => stub,
-  'truth-update':     () => stub,
-  'truth-annotate':   () => stub,
-  'truth-freeze':     () => stub,
-  'truth-supersede':  () => stub,
-  'truth-discard':    () => stub,
-  'truth-read':       () => stub,
-  'truth-query':      () => stub,
-  'truth-rebuild':    () => stub,
+  'truth-propose':    () => truthCommand('propose'),
+  'truth-update':     () => truthCommand('update'),
+  'truth-annotate':   () => truthCommand('annotate'),
+  'truth-freeze':     () => truthCommand('freeze'),
+  'truth-supersede':  () => truthCommand('supersede'),
+  'truth-discard':    () => truthCommand('discard'),
+  'truth-read':       () => truthCommand('read'),
+  'truth-query':      () => truthCommand('query'),
+  'truth-rebuild':    () => truthCommand('rebuild'),
   'delta-validate':   () => stub,
   'handoff-validate': () => stub,
   'bundle-validate':  () => stub,
   'render':           () => stub,
   'render-check':     () => stub,
-  'log-agent':        () => stub,
-  'log-transition':   () => stub,
-  'log-read':         () => stub,
+  'log-agent':        () => logCommand('agent'),
+  'log-transition':   () => logCommand('transition'),
+  'log-read':         () => logCommand('logread'),
   'preflight-update': () => stub,
 };
 
 function stub(args) {
   exitError('Command not yet implemented (see Plan 2-3)', [], 3);
+}
+
+function truthCommand(action) {
+  return function(args) {
+    const ts = require('./lib/truth-surface.cjs');
+    const { resolveRoot } = require('./lib/utils.cjs');
+    const root = resolveRoot(process.cwd());
+    if (!root) exitError('.bonfire/ not found', []);
+    const dir = path.dirname(root);
+
+    try {
+      switch (action) {
+        case 'propose': exitJSON(ts.propose(dir, args)); break;
+        case 'update': exitJSON(ts.update(dir, args)); break;
+        case 'annotate': exitJSON(ts.annotate(dir, args)); break;
+        case 'freeze': exitJSON(ts.freeze(dir, args)); break;
+        case 'supersede': exitJSON(ts.supersede(dir, args)); break;
+        case 'discard': exitJSON(ts.discard(dir, args)); break;
+        case 'read': {
+          const snapshot = ts.loadSnapshot(dir);
+          exitJSON(snapshot || { entries: {}, by_status: {}, by_category: {} });
+          break;
+        }
+        case 'query': exitJSON(ts.query(dir, args)); break;
+        case 'rebuild': exitJSON(ts.rebuild(dir)); break;
+      }
+    } catch (err) {
+      exitError(err.message, []);
+    }
+  };
+}
+
+function logCommand(action) {
+  return function(args) {
+    const { appendLog, readLog } = require('./lib/logger.cjs');
+    const { resolveRoot } = require('./lib/utils.cjs');
+    const root = resolveRoot(process.cwd());
+    if (!root) exitError('.bonfire/ not found', []);
+    const logsDir = path.join(root, 'logs');
+
+    switch (action) {
+      case 'agent': {
+        appendLog(path.join(logsDir, 'agent-invocations.jsonl'),
+          { event: args.event, agent: args.agent, step: args.step, error: args.error || null });
+        exitJSON({ success: true });
+        break;
+      }
+      case 'transition': {
+        appendLog(path.join(logsDir, 'state-transitions.jsonl'),
+          { step: args.step, from: args.from, to: args.to });
+        exitJSON({ success: true });
+        break;
+      }
+      case 'logread': {
+        const typeMap = { 'render': 'render.jsonl', 'state-transitions': 'state-transitions.jsonl', 'agent-invocations': 'agent-invocations.jsonl' };
+        const filename = typeMap[args.type];
+        if (!filename) exitError(`Unknown log type: ${args.type}`, Object.keys(typeMap));
+        exitJSON(readLog(path.join(logsDir, filename), { since: args.since }));
+        break;
+      }
+    }
+  };
 }
 
 function routeCommand(args) {
