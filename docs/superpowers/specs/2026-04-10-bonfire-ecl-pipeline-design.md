@@ -16,11 +16,13 @@ Bonfire is a native Claude Code plugin that reimplements the Evolution Constrain
 
 ### Deferred to v2
 
-| Item | ECL equivalent | Reason |
-|------|---------------|--------|
-| Canvas rendering | Obsidian Canvas visual overview | Add when kanban features needed |
-| docs/ documentation | 4 articles x 2 languages | Add after plugin stabilizes |
-| OpenSpec export | openspec-mapping.md | Optional export format |
+
+| Item                | ECL equivalent                  | Reason                          |
+| ------------------- | ------------------------------- | ------------------------------- |
+| Canvas rendering    | Obsidian Canvas visual overview | Add when kanban features needed |
+| docs/ documentation | 4 articles x 2 languages        | Add after plugin stabilizes     |
+| OpenSpec export     | openspec-mapping.md             | Optional export format          |
+
 
 ---
 
@@ -202,16 +204,18 @@ truth-propose → append to history.jsonl
 
 Each entry has a `category` field with distinct lifecycle rules:
 
-| Category | Maturity Gate | Can Freeze? | Description |
-|----------|-------------|-------------|-------------|
-| `retained_goal` | challenged_by non-empty | Yes | User's real goals |
-| `confirmed_fact` | source must contain repo evidence | Yes (no challenged_by needed) | Repo/environment facts |
-| `frozen_constraint` | challenged_by non-empty | Yes | Immutable constraints |
-| `challenged_claim` | Stays CHALLENGED until resolved | Resolves by reclassifying to another category | Questioned user claims |
-| `discarded_option` | rationale non-empty | No (terminal state = DISCARDED) | Eliminated paths with reasons |
-| `high_impact_risk` | Never freezes | No (stays OPEN permanently) | Explicit remaining uncertainty |
-| `dependency_chain` | Upstream/downstream ID refs valid | Yes | End-to-end dependencies |
-| `acceptance_semantic` | challenged_by non-empty | Yes | Success criteria definitions |
+
+| Category              | Maturity Gate                     | Can Freeze?                                   | Description                    |
+| --------------------- | --------------------------------- | --------------------------------------------- | ------------------------------ |
+| `retained_goal`       | challenged_by non-empty           | Yes                                           | User's real goals              |
+| `confirmed_fact`      | source must contain repo evidence | Yes (no challenged_by needed)                 | Repo/environment facts         |
+| `frozen_constraint`   | challenged_by non-empty           | Yes                                           | Immutable constraints          |
+| `challenged_claim`    | Stays CHALLENGED until resolved   | Resolves by reclassifying to another category | Questioned user claims         |
+| `discarded_option`    | rationale non-empty               | No (terminal state = DISCARDED)               | Eliminated paths with reasons  |
+| `high_impact_risk`    | Never freezes                     | No (stays OPEN permanently)                   | Explicit remaining uncertainty |
+| `dependency_chain`    | Upstream/downstream ID refs valid | Yes                                           | End-to-end dependencies        |
+| `acceptance_semantic` | challenged_by non-empty           | Yes                                           | Success criteria definitions   |
+
 
 ### 2.3 Entry Lifecycle by Category
 
@@ -239,18 +243,20 @@ Six event types:
 {"type":"discard","id":"DROP-001","category":"discarded_option","content":"...","rationale":"...","timestamp":"..."}
 ```
 
-| Type | Semantics | Precondition | Writable Fields |
-|------|-----------|-------------|-----------------|
-| `propose` | Create entry | None | All |
-| `update` | Set field | Entry exists AND not FROZEN | Any field |
-| `annotate` | Append metadata to frozen entry | Entry is FROZEN (or any terminal state) | Whitelist only: evidence_refs, aligned_by, notes |
-| `freeze` | Transition to FROZEN | Category-specific maturity gate | None (status change only) |
-| `supersede` | Old→SUPERSEDED, new→FROZEN | Old entry must be FROZEN | None (creates new entry) |
-| `discard` | Terminal DISCARDED state | rationale non-empty | None (terminal) |
 
-**`challenged_by` and `aligned_by` are arrays.** `truth-update` appends to these fields, not overwrites. Maturity gate checks `challenged_by.length > 0`.
+| Type        | Semantics                       | Precondition                            | Writable Fields                                  |
+| ----------- | ------------------------------- | --------------------------------------- | ------------------------------------------------ |
+| `propose`   | Create entry                    | None                                    | All                                              |
+| `update`    | Set field                       | Entry exists AND not FROZEN             | Any field                                        |
+| `annotate`  | Append metadata to frozen entry | Entry is FROZEN (or any terminal state) | Whitelist only: evidence_refs, aligned_by, notes |
+| `freeze`    | Transition to FROZEN            | Category-specific maturity gate         | None (status change only)                        |
+| `supersede` | Old→SUPERSEDED, new→FROZEN      | Old entry must be FROZEN                | None (creates new entry)                         |
+| `discard`   | Terminal DISCARDED state        | rationale non-empty                     | None (terminal)                                  |
 
-**`annotate` rejects fields not in whitelist** (evidence_refs, aligned_by, notes). Content, rationale, and other semantic fields are immutable once frozen.
+
+`**challenged_by` and `aligned_by` are arrays.** `truth-update` appends to these fields, not overwrites. Maturity gate checks `challenged_by.length > 0`.
+
+`**annotate` rejects fields not in whitelist** (evidence_refs, aligned_by, notes). Content, rationale, and other semantic fields are immutable once frozen.
 
 ### 2.5 Snapshot JSON Structure
 
@@ -395,34 +401,38 @@ pending → running → awaiting_agent → integrating → gate_check → passed
                                                    gate_failed
 ```
 
-| Status | Meaning | Trigger |
-|--------|---------|---------|
-| `pending` | Waiting for prior step | Init |
-| `running` | Parent skill executing | Skill orchestrator |
-| `awaiting_agent` | Agent spawned, waiting for output | Skill spawn Agent() |
-| `awaiting_user` | Needs human decision | Stage A approval, reentry depth exceeded, /code iteration exhausted, /achieve acceptance |
-| `integrating` | Agent delta returned, parent executing truth surface mutations | delta-parser + truth-* commands |
-| `gate_check` | Exit gate validating | Skill orchestrator |
-| `passed` | Step complete | Gate passed |
-| `gate_failed` | Gate failed, needs reentry | Gate failed |
+
+| Status           | Meaning                                                        | Trigger                                                                                  |
+| ---------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pending`        | Waiting for prior step                                         | Init                                                                                     |
+| `running`        | Parent skill executing                                         | Skill orchestrator                                                                       |
+| `awaiting_agent` | Agent spawned, waiting for output                              | Skill spawn Agent()                                                                      |
+| `awaiting_user`  | Needs human decision                                           | Stage A approval, reentry depth exceeded, /code iteration exhausted, /achieve acceptance |
+| `integrating`    | Agent delta returned, parent executing truth surface mutations | delta-parser + truth-* commands                                                          |
+| `gate_check`     | Exit gate validating                                           | Skill orchestrator                                                                       |
+| `passed`         | Step complete                                                  | Gate passed                                                                              |
+| `gate_failed`    | Gate failed, needs reentry                                     | Gate failed                                                                              |
+
 
 ### 3.4 Exit Gate Rules
 
-| Step | Exit Gate | Failure Reentry |
-|------|-----------|----------------|
-| stage-a | User explicitly approves approval pack | — (must pass) |
-| stage-b | >= 3 materially different options, 1 retained | stage-a |
-| stage-c | All requirement units have success criteria | stage-b |
-| stage-d | d-critique agent returned delta, >= 1 challenge integrated | stage-c |
-| stage-e | Dependency chain has no gaps (all dependency_chain refs valid) | stage-c |
-| stage-f | All probes have results or inability-to-probe records | stage-e |
-| stage-g | Red/blue complete + residual risks recorded + all mature CHALLENGED entries frozen (high_impact_risk stays OPEN) | stage-d |
-| stage-h | h-review verdict = approved or approved_with_conditions | verdict's conflict_type → route table |
-| stage-j | compile-output.json passes schema validation, code_ready=true | stage-h (handoff_incomplete) |
-| unit-N | evaluator verdict = PASS | Retry (max 5) or reentry to plan |
-| verify | All verification_commands pass | — |
-| accept | Acceptance verdict recorded | — |
-| archive | Archived or explicitly marked not_achieved | — |
+
+| Step    | Exit Gate                                                                                                        | Failure Reentry                       |
+| ------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| stage-a | User explicitly approves approval pack                                                                           | — (must pass)                         |
+| stage-b | >= 3 materially different options, 1 retained                                                                    | stage-a                               |
+| stage-c | All requirement units have success criteria                                                                      | stage-b                               |
+| stage-d | d-critique agent returned delta, >= 1 challenge integrated                                                       | stage-c                               |
+| stage-e | Dependency chain has no gaps (all dependency_chain refs valid)                                                   | stage-c                               |
+| stage-f | All probes have results or inability-to-probe records                                                            | stage-e                               |
+| stage-g | Red/blue complete + residual risks recorded + all mature CHALLENGED entries frozen (high_impact_risk stays OPEN) | stage-d                               |
+| stage-h | h-review verdict = approved or approved_with_conditions                                                          | verdict's conflict_type → route table |
+| stage-j | compile-output.json passes schema validation, code_ready=true                                                    | stage-h (handoff_incomplete)          |
+| unit-N  | evaluator verdict = PASS                                                                                         | Retry (max 5) or reentry to plan      |
+| verify  | All verification_commands pass                                                                                   | —                                     |
+| accept  | Acceptance verdict recorded                                                                                      | —                                     |
+| archive | Archived or explicitly marked not_achieved                                                                       | —                                     |
+
 
 ### 3.5 Unified Conflict Type Enum and Route Table
 
@@ -516,7 +526,7 @@ if (state.pending_reentry) {
 
 ### 3.8 code_ready Authority
 
-**`code_ready` exists only in `compile-output.json#handoff`.** It is not duplicated in `state.json`. `/bonfire:code` reads it directly from the handoff.
+`**code_ready` exists only in `compile-output.json#handoff`.** It is not duplicated in `state.json`. `/bonfire:code` reads it directly from the handoff.
 
 ---
 
@@ -553,13 +563,15 @@ All independent agents (D/G-Red/G-Blue) output JSON directly. No markdown parsin
 
 ### 4.2 Per-Agent Delta Constraints
 
-| Agent | proposals | challenges | alignments | follow_up | verdict |
-|-------|-----------|------------|------------|-----------|---------|
-| D-Critique | allowed | **required >= 1** | allowed | allowed | — |
-| G-Red | allowed | **required >= 1** | — | allowed | — |
-| G-Blue | allowed | — | **required >= 1** | allowed | — |
-| H-Review | — | — | — | — | **required** |
-| J-Compile | — | — | — | — | produces compile-output.json |
+
+| Agent      | proposals | challenges        | alignments        | follow_up | verdict                      |
+| ---------- | --------- | ----------------- | ----------------- | --------- | ---------------------------- |
+| D-Critique | allowed   | **required >= 1** | allowed           | allowed   | —                            |
+| G-Red      | allowed   | **required >= 1** | —                 | allowed   | —                            |
+| G-Blue     | allowed   | —                 | **required >= 1** | allowed   | —                            |
+| H-Review   | —         | —                 | —                 | —         | **required**                 |
+| J-Compile  | —         | —                 | —                 | —         | produces compile-output.json |
+
 
 "Required" means delta-parser rejects the output if the field is missing or empty.
 
@@ -582,23 +594,27 @@ H-Review outputs a verdict JSON (the only agent that directly writes a JSON file
 }
 ```
 
-| Verdict | Meaning | Next |
-|---------|---------|------|
-| `approved` | Pass | Proceed to stage-j |
+
+| Verdict                    | Meaning          | Next                                      |
+| -------------------------- | ---------------- | ----------------------------------------- |
+| `approved`                 | Pass             | Proceed to stage-j                        |
 | `approved_with_conditions` | Conditional pass | Conditions injected into J-Compile prompt |
-| `rejected` | Reject | conflict_type → route table → reentry |
+| `rejected`                 | Reject           | conflict_type → route table → reentry     |
+
 
 ### 4.4 Agent Tool Permissions
 
-| Agent | Read | Bash | Write | Glob | Grep |
-|-------|------|------|-------|------|------|
-| D-Critique | yes | no | no | yes | yes |
-| G-Red | yes | no | no | yes | yes |
-| G-Blue | yes | no | no | yes | yes |
-| H-Review | yes | no | yes (h-review-verdict.json only) | yes | yes |
-| J-Compile | yes | no | yes (compile-output.json only) | yes | yes |
-| Coder | yes | yes | yes | yes | yes |
-| Evaluator | yes | yes | yes (evaluator-verdict.json only) | yes | yes |
+
+| Agent      | Read | Bash | Write                             | Glob | Grep |
+| ---------- | ---- | ---- | --------------------------------- | ---- | ---- |
+| D-Critique | yes  | no   | no                                | yes  | yes  |
+| G-Red      | yes  | no   | no                                | yes  | yes  |
+| G-Blue     | yes  | no   | no                                | yes  | yes  |
+| H-Review   | yes  | no   | yes (h-review-verdict.json only)  | yes  | yes  |
+| J-Compile  | yes  | no   | yes (compile-output.json only)    | yes  | yes  |
+| Coder      | yes  | yes  | yes                               | yes  | yes  |
+| Evaluator  | yes  | yes  | yes (evaluator-verdict.json only) | yes  | yes  |
+
 
 D/G-Red/G-Blue have no Write permission. They return delta JSON through Agent() return value. Parent persists it.
 
@@ -679,12 +695,14 @@ J-Compile:
 
 Support agents vs independent agents:
 
-| | Support agents (A) | Independent agents (D/G/H/J) |
-|---|---|---|
-| Required? | Optional (parent can complete A alone) | Required (cannot skip) |
-| Parallelism | See spawn order above | Strictly sequential (D→G-Red→G-Blue→H→J) |
-| Delta validation | Lenient (no "required >= 1" constraint) | Strict (per-role constraint table) |
+
+|                    | Support agents (A)                                          | Independent agents (D/G/H/J)                       |
+| ------------------ | ----------------------------------------------------------- | -------------------------------------------------- |
+| Required?          | Optional (parent can complete A alone)                      | Required (cannot skip)                             |
+| Parallelism        | See spawn order above                                       | Strictly sequential (D→G-Red→G-Blue→H→J)           |
+| Delta validation   | Lenient (no "required >= 1" constraint)                     | Strict (per-role constraint table)                 |
 | Output destination | Merged into question list, no direct truth surface mutation | Parent executes truth surface mutations from delta |
+
 
 ### 4.7 /bonfire:plan Orchestration
 
@@ -1065,12 +1083,14 @@ All commands operate on `.bonfire/` in the current working directory. One active
 
 ### 6.2 Output Convention
 
-| Scenario | stdout | stderr | exit code |
-|----------|--------|--------|-----------|
-| Success | JSON result (for parent skill to parse) | none | 0 |
-| Validation failure | `{"error":"...","details":[...]}` | none | 1 |
-| Argument error | none | usage hint | 2 |
-| Internal error | none | error message | 3 |
+
+| Scenario           | stdout                                  | stderr        | exit code |
+| ------------------ | --------------------------------------- | ------------- | --------- |
+| Success            | JSON result (for parent skill to parse) | none          | 0         |
+| Validation failure | `{"error":"...","details":[...]}`       | none          | 1         |
+| Argument error     | none                                    | usage hint    | 2         |
+| Internal error     | none                                    | error message | 3         |
+
 
 stdout is always JSON or empty. Parent skill consumes via `JSON.parse(stdout)`.
 
@@ -1088,6 +1108,7 @@ bonfire-tools.cjs archive-list
 ```
 
 `init` creates:
+
 ```
 .bonfire/
 ├── state.json                              # All fields initialized
@@ -1104,6 +1125,7 @@ bonfire-tools.cjs archive-list
 ```
 
 case.json initial skeleton:
+
 ```json
 {
   "bundle_version": 1,
@@ -1121,9 +1143,6 @@ case.json initial skeleton:
     "red_blue": null,
     "review": null,
     "compile_for_code": null
-  },
-  "artifacts": {
-    "compile_output": null
   }
 }
 ```
@@ -1209,17 +1228,19 @@ Internally: reads compile-output.json → modifies only code_preflight mutable f
 
 ### 6.11 Command Summary
 
-| Domain | Count | Commands |
-|--------|-------|----------|
-| Init | 3 | `init`, `archive`, `archive-list` |
-| State | 9 | `state-read`, `state-advance`, `state-reentry`, `state-pending-reentry`, `state-clear-reentry`, `state-step`, `state-begin-run`, `state-complete-run`, `state-init-code-steps` |
-| Truth | 9 | `truth-propose`, `truth-update`, `truth-annotate`, `truth-freeze`, `truth-supersede`, `truth-discard`, `truth-read`, `truth-query`, `truth-rebuild` |
-| Delta | 3 | `delta-validate`, `handoff-validate`, `bundle-validate` |
-| Render | 2 | `render`, `render-check` |
-| Log | 3 | `log-agent`, `log-transition`, `log-read` |
-| Route | 1 | `route` |
-| Preflight | 1 | `preflight-update` |
-| **Total** | **31** | |
+
+| Domain    | Count  | Commands                                                                                                                                                                       |
+| --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Init      | 3      | `init`, `archive`, `archive-list`                                                                                                                                              |
+| State     | 9      | `state-read`, `state-advance`, `state-reentry`, `state-pending-reentry`, `state-clear-reentry`, `state-step`, `state-begin-run`, `state-complete-run`, `state-init-code-steps` |
+| Truth     | 9      | `truth-propose`, `truth-update`, `truth-annotate`, `truth-freeze`, `truth-supersede`, `truth-discard`, `truth-read`, `truth-query`, `truth-rebuild`                            |
+| Delta     | 3      | `delta-validate`, `handoff-validate`, `bundle-validate`                                                                                                                        |
+| Render    | 2      | `render`, `render-check`                                                                                                                                                       |
+| Log       | 3      | `log-agent`, `log-transition`, `log-read`                                                                                                                                      |
+| Route     | 1      | `route`                                                                                                                                                                        |
+| Preflight | 1      | `preflight-update`                                                                                                                                                             |
+| **Total** | **31** |                                                                                                                                                                                |
+
 
 ### 6.12 Internal Call Graph
 
@@ -1253,13 +1274,15 @@ preflight-update
 
 **Zero external dependencies.** bonfire-tools.cjs and all lib/ modules use only Node.js built-in modules:
 
-| Function | Node.js built-in |
-|----------|-----------------|
-| JSON read/write | `fs.readFileSync` / writeAtomic (write-then-rename) |
-| Path operations | `path` |
-| Timestamps | `Date.toISOString()` |
-| SHA256 | `crypto.createHash` |
-| Directory operations | `fs.mkdirSync` / `fs.readdirSync` |
+
+| Function             | Node.js built-in                                    |
+| -------------------- | --------------------------------------------------- |
+| JSON read/write      | `fs.readFileSync` / writeAtomic (write-then-rename) |
+| Path operations      | `path`                                              |
+| Timestamps           | `Date.toISOString()`                                |
+| SHA256               | `crypto.createHash`                                 |
+| Directory operations | `fs.mkdirSync` / `fs.readdirSync`                   |
+
 
 No npm dependencies, no node_modules/, no package.json dependencies. Install and run.
 
