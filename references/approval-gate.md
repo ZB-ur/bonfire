@@ -17,12 +17,25 @@ Turn a raw user idea into an approved, frozen planning target before stages B–
 
 ## Truth Surface Actions During Stage A
 
-As answers come in, the parent skill should:
+As answers come in, the parent skill should propose truth surface entries using the full command format:
 
-- `truth-propose confirmed_fact` for verified repo/environment facts (from reality-checker)
-- `truth-propose challenged_claim` for dubious user claims
-- `truth-propose retained_goal` for confirmed user goals
-- `truth-propose acceptance_semantic` for acceptance criteria
+```
+bonfire truth-propose --id <ID> --category <cat> --content "..." --rationale "..." --source stage-a
+```
+
+ID naming conventions by category:
+- `FACT-NNN` — confirmed_fact
+- `CON-NNN` — retained_goal, frozen_constraint
+- `CLAIM-NNN` — challenged_claim
+- `RISK-NNN` — high_impact_risk
+- `DEP-NNN` — dependency_chain
+- `ACC-NNN` — acceptance_semantic
+- `DROP-NNN` — discarded_option
+
+Example:
+```
+bonfire truth-propose --id FACT-001 --category confirmed_fact --content "PostgreSQL 14.2 running" --rationale "Verified from docker-compose.yaml" --source stage-a
+```
 
 ## Approval Pack
 
@@ -42,9 +55,10 @@ If the user responds with changes, update the approval pack and ask for approval
 
 After the user approves:
 
-- `truth-freeze` all `confirmed_fact` entries
-- `truth-propose` remaining `retained_goal` and `acceptance_semantic` entries
-- `state-step --step stage-a --status passed`
-- `state-advance --step stage-a`
+- `bonfire truth-freeze --id <ID>` for each `confirmed_fact` entry
+- `bonfire truth-propose --id <ID> --category retained_goal --content "..." --rationale "..." --source stage-a` for remaining goals
+- `bonfire truth-propose --id <ID> --category acceptance_semantic --content "..." --rationale "..." --source stage-a` for acceptance criteria
+- `bonfire state-step --step stage-a --status passed`
+- `bonfire state-advance --step stage-a`
 
 Output: "Stage A passed. Please execute /bonfire:plan"

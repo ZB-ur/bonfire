@@ -80,7 +80,9 @@ Exit gate: all requirement units have success criteria.
 - Spawn `bonfire-d-critique` agent.
 - Agent attacks vague, contradictory, or wasteful requirements.
 - Agent returns delta JSON with challenges >= 1.
-- Parent integrates: `truth-propose` (proposals), `truth-update challenged_by` (challenges).
+- Parent integrates:
+  - For each proposal: `bonfire truth-propose --id <ID> --category <cat> --content "..." --rationale "..." --source stage-d`
+  - For each challenge: `bonfire truth-update --id <target> --field challenged_by --value d-critique`
 
 Exit gate: delta validated, >= 1 challenge integrated into truth surface.
 
@@ -109,7 +111,10 @@ Exit gate: all probes have results or inability-to-probe records.
 - G-Red attacks edge cases, abuse paths, dependency breaks, and invalid states.
 - G-Blue mitigates, constrains, or explicitly accepts residual risk.
 - Parent integrates deltas into truth surface.
-- Truth-Freeze Gate (part of stage-g exit): scan CHALLENGED entries, freeze those meeting maturity gate. `high_impact_risk` stays OPEN.
+- Truth-Freeze Gate (part of stage-g exit):
+  - `bonfire truth-query --status CHALLENGED` to find eligible entries
+  - `bonfire truth-freeze --id <ID>` for each entry meeting its category's maturity gate
+  - `high_impact_risk` entries stay OPEN (never freeze)
 
 Exit gate: red/blue complete + residual risks recorded + all mature CHALLENGED entries frozen.
 
