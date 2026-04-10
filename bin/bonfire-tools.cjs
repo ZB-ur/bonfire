@@ -27,19 +27,109 @@ const COMMANDS = {
   'truth-read':       () => truthCommand('read'),
   'truth-query':      () => truthCommand('query'),
   'truth-rebuild':    () => truthCommand('rebuild'),
-  'delta-validate':   () => stub,
-  'handoff-validate': () => stub,
-  'bundle-validate':  () => stub,
-  'render':           () => stub,
-  'render-check':     () => stub,
+  'delta-validate':   () => deltaValidateCommand,
+  'handoff-validate': () => handoffValidateCommand,
+  'bundle-validate':  () => bundleValidateCommand,
+  'render':           () => renderCommand,
+  'render-check':     () => renderCheckCommand,
   'log-agent':        () => logCommand('agent'),
   'log-transition':   () => logCommand('transition'),
   'log-read':         () => logCommand('logread'),
-  'preflight-update': () => stub,
+  'preflight-update': () => preflightCommand,
 };
 
-function stub(args) {
-  exitError('Command not yet implemented (see Plan 2-3)', [], 3);
+function deltaValidateCommand(args) {
+  const { validateDelta } = require('./lib/delta-parser.cjs');
+  const { loadJSON } = require('./lib/utils.cjs');
+  const agent = args.agent;
+  if (!agent) { process.stderr.write('Usage: delta-validate --agent <name> --file <path>\n'); process.exit(2); }
+  let data;
+  if (args.file) {
+    data = loadJSON(args.file);
+    if (!data) exitError(`Cannot read file: ${args.file}`, []);
+  } else {
+    data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+  }
+  const result = validateDelta(agent, data);
+  if (result.valid) exitJSON({ valid: true });
+  else exitError('Validation failed', result.errors);
+}
+
+function handoffValidateCommand(args) {
+  const { validateHandoff } = require('./lib/schema.cjs');
+  const { resolveRoot, loadJSON } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const co = loadJSON(path.join(root, 'plan', 'compile-output.json'));
+  if (!co) exitError('compile-output.json not found', []);
+  const result = validateHandoff(co);
+  if (result.valid) exitJSON({ valid: true });
+  else exitError('Handoff validation failed', result.errors);
+}
+
+function bundleValidateCommand(args) {
+  const { validateBundle } = require('./lib/schema.cjs');
+  const { resolveRoot } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  exitJSON(validateBundle(path.dirname(root)));
+}
+
+function renderCommand(args) {
+  const { renderNote, renderAll } = require('./lib/renderer.cjs');
+  const { resolveRoot } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+  if (args.all) {
+    exitJSON(renderAll(dir, { run_id: args.run }));
+  } else if (args.note) {
+    const result = renderNote(dir, args.note, { run_id: args.run });
+    if (result.success) exitJSON(result);
+    else exitError(result.error, []);
+  } else {
+    process.stderr.write('Usage: render --note <id> | --all [--run <run-id>]\n');
+    process.exit(2);
+  }
+}
+
+function renderCheckCommand(args) {
+  const { renderCheck } = require('./lib/renderer.cjs');
+  const { resolveRoot } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  exitJSON(renderCheck(path.dirname(root)));
+}
+
+function preflightCommand(args) {
+  const { resolveRoot, loadJSON, writeAtomic, loadSchema } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const field = args.field;
+  if (!field) { process.stderr.write('Usage: preflight-update --field <field> --value <value>\n'); process.exit(2); }
+  const schema = loadSchema();
+  const mutableFields = schema ? schema.preflight_mutable_fields : [];
+  if (field === 'progress' && args.unit) {
+    const coPath = path.join(root, 'plan', 'compile-output.json');
+    const co = loadJSON(coPath);
+    if (!co) exitError('compile-output.json not found', []);
+    if (!co.code_preflight) co.code_preflight = {};
+    if (!co.code_preflight.progress_snapshot) co.code_preflight.progress_snapshot = {};
+    co.code_preflight.progress_snapshot[args.unit] = args.status || 'in_progress';
+    writeAtomic(coPath, co);
+    exitJSON({ success: true, field: 'progress_snapshot', unit: args.unit, status: args.status });
+    return;
+  }
+  if (!mutableFields.includes(field)) {
+    exitError(`Field "${field}" is not in mutable whitelist [${mutableFields.join(', ')}]`, mutableFields);
+  }
+  const coPath = path.join(root, 'plan', 'compile-output.json');
+  const co = loadJSON(coPath);
+  if (!co) exitError('compile-output.json not found', []);
+  if (!co.code_preflight) co.code_preflight = {};
+  co.code_preflight[field] = args.value;
+  writeAtomic(coPath, co);
+  exitJSON({ success: true, field, value: args.value });
 }
 
 function truthCommand(action) {
