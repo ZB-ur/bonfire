@@ -31,25 +31,25 @@ test('propose creates PROPOSED entry with correct snapshot indices', () => {
     propose(root, {
       id: 'c-001',
       category: 'retained_goal',
-      statement: 'The system must support offline mode.',
+      content: 'The system must support offline mode.',
     });
 
     propose(root, {
       id: 'c-002',
       category: 'confirmed_fact',
-      statement: 'Users have intermittent connectivity.',
+      content: 'Users have intermittent connectivity.',
     });
 
     const snapshot = loadSnapshot(root);
     assert.ok(snapshot, 'snapshot should exist');
-    assert.equal(snapshot.entries.length, 2);
+    assert.equal(Object.keys(snapshot.entries).length, 2);
 
-    const first = snapshot.entries[0];
+    const first = snapshot.entries['c-001'];
     assert.equal(first.id, 'c-001');
     assert.equal(first.status, 'PROPOSED');
     assert.equal(first.category, 'retained_goal');
 
-    const second = snapshot.entries[1];
+    const second = snapshot.entries['c-002'];
     assert.equal(second.id, 'c-002');
     assert.equal(second.status, 'PROPOSED');
     assert.equal(second.category, 'confirmed_fact');
@@ -67,13 +67,13 @@ test('propose with discarded_option creates DISCARDED entry', () => {
     propose(root, {
       id: 'c-010',
       category: 'discarded_option',
-      statement: 'Use blockchain for storage.',
+      content: 'Use blockchain for storage.',
       rationale: 'Too complex and unnecessary.',
     });
 
     const snapshot = loadSnapshot(root);
-    assert.equal(snapshot.entries.length, 1);
-    const entry = snapshot.entries[0];
+    assert.equal(Object.keys(snapshot.entries).length, 1);
+    const entry = snapshot.entries['c-010'];
     assert.equal(entry.id, 'c-010');
     assert.equal(entry.status, 'DISCARDED');
     assert.equal(entry.category, 'discarded_option');
@@ -91,12 +91,12 @@ test('propose with high_impact_risk creates OPEN entry', () => {
     propose(root, {
       id: 'c-020',
       category: 'high_impact_risk',
-      statement: 'Vendor may discontinue API by Q4.',
+      content: 'Vendor may discontinue API by Q4.',
     });
 
     const snapshot = loadSnapshot(root);
-    assert.equal(snapshot.entries.length, 1);
-    const entry = snapshot.entries[0];
+    assert.equal(Object.keys(snapshot.entries).length, 1);
+    const entry = snapshot.entries['c-020'];
     assert.equal(entry.id, 'c-020');
     assert.equal(entry.status, 'OPEN');
     assert.equal(entry.category, 'high_impact_risk');
@@ -114,12 +114,12 @@ test('update appends to challenged_by array, auto-transitions to CHALLENGED', ()
     propose(root, {
       id: 'c-030',
       category: 'retained_goal',
-      statement: 'Must support 10k concurrent users.',
+      content: 'Must support 10k concurrent users.',
     });
 
     // Verify initial status
     let snapshot = loadSnapshot(root);
-    assert.equal(snapshot.entries[0].status, 'PROPOSED');
+    assert.equal(snapshot.entries['c-030'].status, 'PROPOSED');
 
     // Update challenged_by
     update(root, {
@@ -129,7 +129,7 @@ test('update appends to challenged_by array, auto-transitions to CHALLENGED', ()
     });
 
     snapshot = loadSnapshot(root);
-    const entry = snapshot.entries[0];
+    const entry = snapshot.entries['c-030'];
     assert.equal(entry.status, 'CHALLENGED');
     assert.deepStrictEqual(entry.challenged_by, ['stage-d-agent']);
 
@@ -141,7 +141,7 @@ test('update appends to challenged_by array, auto-transitions to CHALLENGED', ()
     });
 
     snapshot = loadSnapshot(root);
-    assert.deepStrictEqual(snapshot.entries[0].challenged_by, ['stage-d-agent', 'stage-g-red']);
+    assert.deepStrictEqual(snapshot.entries['c-030'].challenged_by, ['stage-d-agent', 'stage-g-red']);
   } finally {
     fs.rmSync(root, { recursive: true });
   }
@@ -156,7 +156,7 @@ test('update rejects writes to FROZEN entries', () => {
     propose(root, {
       id: 'c-040',
       category: 'confirmed_fact',
-      statement: 'The API returns JSON.',
+      content: 'The API returns JSON.',
     });
 
     // Freeze it (confirmed_fact has evidence_required gate, which passes without checks)
@@ -164,11 +164,11 @@ test('update rejects writes to FROZEN entries', () => {
     freeze(root, { id: 'c-040' });
 
     let snapshot = loadSnapshot(root);
-    assert.equal(snapshot.entries[0].status, 'FROZEN');
+    assert.equal(snapshot.entries['c-040'].status, 'FROZEN');
 
     // Attempt to update should throw
     assert.throws(
-      () => update(root, { id: 'c-040', field: 'statement', value: 'New value' }),
+      () => update(root, { id: 'c-040', field: 'content', value: 'New value' }),
       /cannot update.*FROZEN/i
     );
   } finally {
@@ -184,9 +184,12 @@ test('replay from empty history produces empty snapshot', () => {
   try {
     const snapshot = replay(root);
     assert.ok(snapshot, 'snapshot should be returned');
-    assert.ok(Array.isArray(snapshot.entries), 'entries should be an array');
-    assert.equal(snapshot.entries.length, 0);
-    assert.ok(snapshot.generated_at, 'generated_at should be set');
+    assert.ok(snapshot.entries && typeof snapshot.entries === 'object' && !Array.isArray(snapshot.entries), 'entries should be an object map');
+    assert.equal(Object.keys(snapshot.entries).length, 0);
+    assert.ok(snapshot.replayed_at, 'replayed_at should be set');
+    assert.equal(snapshot.version, 1);
+    assert.ok(snapshot.by_status, 'by_status should be set');
+    assert.ok(snapshot.by_category, 'by_category should be set');
   } finally {
     fs.rmSync(root, { recursive: true });
   }

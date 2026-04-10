@@ -93,7 +93,7 @@ function replay(root) {
       const entry = {
         id,
         category,
-        statement: event.statement,
+        content: event.content,
         status: initialStatus,
         source: event.source || null,
         rationale: event.rationale || null,
@@ -113,7 +113,7 @@ function replay(root) {
       const entry = {
         id,
         category,
-        statement: event.statement,
+        content: event.content,
         status: 'DISCARDED',
         source: event.source || null,
         rationale: event.rationale || null,
@@ -177,7 +177,7 @@ function replay(root) {
 
     } else if (type === 'supersede') {
       // old entry -> SUPERSEDED
-      const oldEntry = entries[event.old_id];
+      const oldEntry = entries[event.supersedes];
       if (oldEntry) {
         oldEntry.status = 'SUPERSEDED';
         oldEntry.superseded_by = id;
@@ -188,7 +188,7 @@ function replay(root) {
       const newEntry = {
         id,
         category,
-        statement: event.statement,
+        content: event.content,
         status: 'FROZEN',
         source: event.source || null,
         rationale: event.rationale || null,
@@ -205,12 +205,31 @@ function replay(root) {
     }
   }
 
-  // Build snapshot with ordered entries
-  const byIndex = order.map(id => entries[id]);
+  // Build by_status index
+  const ALL_STATUSES = ['proposed', 'challenged', 'frozen', 'superseded', 'open', 'discarded'];
+  const by_status = {};
+  for (const s of ALL_STATUSES) by_status[s] = [];
+  for (const id of order) {
+    const entry = entries[id];
+    const key = entry.status.toLowerCase();
+    if (by_status[key]) by_status[key].push(id);
+  }
+
+  // Build by_category index
+  const by_category = {};
+  for (const cat of Object.keys(CATEGORY_INITIAL_STATUS)) by_category[cat] = [];
+  for (const id of order) {
+    const entry = entries[id];
+    if (by_category[entry.category]) by_category[entry.category].push(id);
+  }
 
   return {
-    generated_at: timestamp(),
-    entries: byIndex,
+    version: 1,
+    replayed_at: timestamp(),
+    event_count: events.length,
+    entries,
+    by_status,
+    by_category,
   };
 }
 
@@ -237,10 +256,10 @@ function rebuild(root) {
 // ---------------------------------------------------------------------------
 
 function propose(root, opts) {
-  const { id, category, statement, source, rationale, notes } = opts;
+  const { id, category, content, source, rationale, notes } = opts;
   if (!id) throw new Error('propose: id is required');
   if (!category) throw new Error('propose: category is required');
-  if (!statement) throw new Error('propose: statement is required');
+  if (!content) throw new Error('propose: content is required');
 
   const validCategories = Object.keys(CATEGORY_INITIAL_STATUS);
   if (!validCategories.includes(category)) {
@@ -252,7 +271,7 @@ function propose(root, opts) {
     type: 'propose',
     id,
     category,
-    statement,
+    content,
     source: source || null,
     rationale: rationale || null,
     notes: notes || null,
@@ -273,7 +292,7 @@ function update(root, opts) {
 
   // Load current snapshot to check status
   const snapshot = loadSnapshot(root) || replay(root);
-  const entry = (snapshot.entries || []).find(e => e.id === id);
+  const entry = (snapshot.entries || {})[id];
   if (!entry) throw new Error(`update: entry "${id}" not found`);
 
   if (entry.status === 'FROZEN' || entry.status === 'SUPERSEDED') {
@@ -308,7 +327,7 @@ function annotate(root, opts) {
 
   // Load current snapshot to check status
   const snapshot = loadSnapshot(root) || replay(root);
-  const entry = (snapshot.entries || []).find(e => e.id === id);
+  const entry = (snapshot.entries || {})[id];
   if (!entry) throw new Error(`annotate: entry "${id}" not found`);
 
   if (entry.status !== 'FROZEN') {
@@ -337,7 +356,7 @@ function freeze(root, opts) {
 
   // Load current snapshot to check entry state
   const snapshot = loadSnapshot(root) || replay(root);
-  const entry = (snapshot.entries || []).find(e => e.id === id);
+  const entry = (snapshot.entries || {})[id];
   if (!entry) throw new Error(`freeze: entry "${id}" not found`);
 
   if (entry.status === 'FROZEN') {
@@ -362,24 +381,24 @@ function freeze(root, opts) {
 // ---------------------------------------------------------------------------
 
 function supersede(root, opts) {
-  const { old_id, new_id, category, statement, source, rationale, notes } = opts;
-  if (!old_id) throw new Error('supersede: old_id is required');
-  if (!new_id) throw new Error('supersede: new_id is required');
+  const { supersedes, id, category, content, source, rationale, notes } = opts;
+  if (!supersedes) throw new Error('supersede: supersedes is required');
+  if (!id) throw new Error('supersede: id is required');
   if (!category) throw new Error('supersede: category is required');
-  if (!statement) throw new Error('supersede: statement is required');
+  if (!content) throw new Error('supersede: content is required');
 
   // Load current snapshot to verify old entry exists
   const snapshot = loadSnapshot(root) || replay(root);
-  const oldEntry = (snapshot.entries || []).find(e => e.id === old_id);
-  if (!oldEntry) throw new Error(`supersede: entry "${old_id}" not found`);
+  const oldEntry = (snapshot.entries || {})[supersedes];
+  if (!oldEntry) throw new Error(`supersede: entry "${supersedes}" not found`);
 
   const historyPath = getHistoryPath(root);
   const event = {
     type: 'supersede',
-    id: new_id,
-    old_id,
+    id,
+    supersedes,
     category,
-    statement,
+    content,
     source: source || null,
     rationale: rationale || null,
     notes: notes || null,
@@ -394,9 +413,9 @@ function supersede(root, opts) {
 // ---------------------------------------------------------------------------
 
 function discard(root, opts) {
-  const { id, category, statement, rationale, source, notes } = opts;
+  const { id, category, content, rationale, source, notes } = opts;
   if (!id) throw new Error('discard: id is required');
-  if (!statement) throw new Error('discard: statement is required');
+  if (!content) throw new Error('discard: content is required');
   if (!rationale || rationale.trim() === '') {
     throw new Error('discard: rationale is required');
   }
@@ -406,7 +425,7 @@ function discard(root, opts) {
     type: 'discard',
     id,
     category: category || 'discarded_option',
-    statement,
+    content,
     rationale,
     source: source || null,
     notes: notes || null,
@@ -422,7 +441,7 @@ function discard(root, opts) {
 
 function query(root, opts) {
   const snapshot = loadSnapshot(root) || replay(root);
-  let entries = snapshot.entries || [];
+  let entries = Object.values(snapshot.entries || {});
 
   if (opts && opts.status) {
     const statuses = Array.isArray(opts.status) ? opts.status : [opts.status];
