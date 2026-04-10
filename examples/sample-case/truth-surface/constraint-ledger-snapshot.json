@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "replayed_at": "2026-04-10T10:50:00Z",
+  "event_count": 12,
+  "entries": {
+    "FACT-001": {
+      "id": "FACT-001",
+      "category": "confirmed_fact",
+      "status": "FROZEN",
+      "content": "Express.js API exists with standard middleware",
+      "rationale": "Verified from repo",
+      "source": "stage-a",
+      "challenged_by": [],
+      "aligned_by": [],
+      "frozen_at": "2026-04-10T09:30:00Z"
+    },
+    "CON-001": {
+      "id": "CON-001",
+      "category": "retained_goal",
+      "status": "FROZEN",
+      "content": "Add OAuth2 login with Google and GitHub providers",
+      "rationale": "Core user request",
+      "source": "stage-a",
+      "challenged_by": ["d-critique"],
+      "aligned_by": [],
+      "frozen_at": "2026-04-10T10:45:00Z"
+    },
+    "CON-002": {
+      "id": "CON-002",
+      "category": "frozen_constraint",
+      "status": "FROZEN",
+      "content": "Use passport.js as OAuth library",
+      "rationale": "Approved in Stage A",
+      "source": "stage-a",
+      "challenged_by": ["d-critique"],
+      "aligned_by": [],
+      "frozen_at": "2026-04-10T10:45:00Z"
+    },
+    "ACC-001": {
+      "id": "ACC-001",
+      "category": "acceptance_semantic",
+      "status": "FROZEN",
+      "content": "OAuth2 login flow completes end-to-end for both providers",
+      "rationale": "Primary acceptance criterion",
+      "source": "stage-c",
+      "challenged_by": ["g-red"],
+      "aligned_by": [],
+      "frozen_at": "2026-04-10T10:50:00Z"
+    },
+    "RISK-001": {
+      "id": "RISK-001",
+      "category": "high_impact_risk",
+      "status": "OPEN",
+      "content": "Token refresh race condition under concurrent requests",
+      "rationale": "Identified by g-red",
+      "source": "stage-g",
+      "challenged_by": [],
+      "aligned_by": []
+    }
+  },
+  "by_status": {
+    "proposed": [],
+    "challenged": [],
+    "frozen": ["FACT-001", "CON-001", "CON-002", "ACC-001"],
+    "superseded": [],
+    "open": ["RISK-001"],
+    "discarded": []
+  },
+  "by_category": {
+    "confirmed_fact": ["FACT-001"],
+    "retained_goal": ["CON-001"],
+    "frozen_constraint": ["CON-002"],
+    "acceptance_semantic": ["ACC-001"],
+    "high_impact_risk": ["RISK-001"],
+    "challenged_claim": [],
+    "discarded_option": [],
+    "dependency_chain": []
+  }
+}

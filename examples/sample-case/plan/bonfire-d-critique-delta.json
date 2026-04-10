@@ -1,0 +1,18 @@
+{
+  "agent": "bonfire-d-critique",
+  "proposals": [],
+  "challenges": [
+    {
+      "target": "CON-001",
+      "reason": "OAuth2 goal does not specify token refresh policy or session timeout behavior"
+    },
+    {
+      "target": "CON-002",
+      "reason": "passport.js has known issues with concurrent session handling in clustered environments"
+    }
+  ],
+  "alignments": [],
+  "follow_up_questions": [
+    "What is the expected session duration and refresh policy?"
+  ]
+}

@@ -13,7 +13,26 @@
       "critical_assumptions": ["PostgreSQL is already running and accessible", "Express.js app uses standard middleware pattern"],
       "frozen_for_code": ["passport.js as OAuth library", "express-session with connect-pg-simple for session store"]
     },
-    "divergence": null,
+    "divergence": {
+      "retained_option": "Option A: passport.js with express-session and connect-pg-simple",
+      "options": [
+        {
+          "title": "Option A: passport.js + express-session",
+          "description": "Use passport.js strategies for Google and GitHub, express-session with connect-pg-simple for PostgreSQL session storage",
+          "blind_spots_covered": "Session persistence, provider abstraction"
+        },
+        {
+          "title": "Option B: Custom OAuth2 flow",
+          "description": "Implement OAuth2 code flow directly using HTTP client, store tokens in PostgreSQL manually",
+          "blind_spots_covered": "Full control, no library lock-in"
+        },
+        {
+          "title": "Option C: Auth0 delegation",
+          "description": "Delegate authentication to Auth0 hosted login, store Auth0 tokens locally",
+          "blind_spots_covered": "Reduced implementation surface, managed security"
+        }
+      ]
+    },
     "requirements": null,
     "critique": null,
     "closure": null,

@@ -1,0 +1,12 @@
+{"type":"propose","id":"FACT-001","category":"confirmed_fact","status":"PROPOSED","content":"Express.js API exists with standard middleware","rationale":"Verified from repo","source":"stage-a","timestamp":"2026-04-10T09:10:00Z"}
+{"type":"propose","id":"CON-001","category":"retained_goal","status":"PROPOSED","content":"Add OAuth2 login with Google and GitHub providers","rationale":"Core user request","source":"stage-a","timestamp":"2026-04-10T09:15:00Z"}
+{"type":"propose","id":"CON-002","category":"frozen_constraint","status":"PROPOSED","content":"Use passport.js as OAuth library","rationale":"Approved in Stage A","source":"stage-a","timestamp":"2026-04-10T09:20:00Z"}
+{"type":"propose","id":"ACC-001","category":"acceptance_semantic","status":"PROPOSED","content":"OAuth2 login flow completes end-to-end for both providers","rationale":"Primary acceptance criterion","source":"stage-c","timestamp":"2026-04-10T10:00:00Z"}
+{"type":"freeze","id":"FACT-001","frozen_at":"2026-04-10T09:30:00Z","timestamp":"2026-04-10T09:30:00Z"}
+{"type":"update","id":"CON-001","field":"challenged_by","value":"d-critique","timestamp":"2026-04-10T10:10:00Z"}
+{"type":"update","id":"CON-002","field":"challenged_by","value":"d-critique","timestamp":"2026-04-10T10:10:00Z"}
+{"type":"update","id":"ACC-001","field":"challenged_by","value":"g-red","timestamp":"2026-04-10T10:30:00Z"}
+{"type":"freeze","id":"CON-001","frozen_at":"2026-04-10T10:45:00Z","timestamp":"2026-04-10T10:45:00Z"}
+{"type":"freeze","id":"CON-002","frozen_at":"2026-04-10T10:45:00Z","timestamp":"2026-04-10T10:45:00Z"}
+{"type":"freeze","id":"ACC-001","frozen_at":"2026-04-10T10:50:00Z","timestamp":"2026-04-10T10:50:00Z"}
+{"type":"propose","id":"RISK-001","category":"high_impact_risk","status":"OPEN","content":"Token refresh race condition under concurrent requests","rationale":"Identified by g-red","source":"stage-g","timestamp":"2026-04-10T10:35:00Z"}
