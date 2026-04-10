@@ -1,3 +1,20 @@
+// Installation: Add this to ~/.claude/settings.json under hooks.PostToolUse:
+//
+// {
+//   "matcher": "Write|Edit",
+//   "hooks": [
+//     {
+//       "type": "command",
+//       "command": "node $HOME/.claude/bonfire/hooks/bonfire-dual-write.js",
+//       "timeout": 10
+//     }
+//   ]
+// }
+//
+// This hook captures agent Write/Edit tool calls to .bonfire/ JSON files
+// (h-review-verdict.json, compile-output.json, run evidence).
+// Truth surface changes go through CLI and self-render (Fix 5), not this hook.
+
 #!/usr/bin/env node
 'use strict';
 
