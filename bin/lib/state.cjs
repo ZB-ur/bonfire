@@ -29,17 +29,29 @@ function getSchema() {
 }
 
 // Get ordered list of steps for a pipeline stage
-function stepsForPipeline(schema, pipelineStage) {
+function stepsForPipeline(schema, pipelineStage, state) {
+  if (state && state.steps) {
+    const steps = [];
+    for (const [name, info] of Object.entries(state.steps)) {
+      if (info.pipeline === pipelineStage) {
+        steps.push(name);
+      }
+    }
+    if (steps.length > 0) return steps;
+  }
   return (schema.step_order[pipelineStage] || []);
 }
 
 // Get all pipeline stage names in order
 function pipelineOrder(schema) {
-  return Object.keys(schema.step_order);
+  return schema.pipeline_order || Object.keys(schema.step_order);
 }
 
 // Find which pipeline a step belongs to
-function findPipelineForStep(schema, stepName) {
+function findPipelineForStep(schema, stepName, state) {
+  if (state && state.steps && state.steps[stepName] && state.steps[stepName].pipeline) {
+    return state.steps[stepName].pipeline;
+  }
   for (const [pipeline, steps] of Object.entries(schema.step_order)) {
     if (steps.includes(stepName)) return pipeline;
   }
@@ -49,8 +61,8 @@ function findPipelineForStep(schema, stepName) {
 // Initialize steps for a pipeline as pending
 function initPipelineSteps(schema, pipelineStage) {
   const steps = {};
-  for (const step of stepsForPipeline(schema, pipelineStage)) {
-    steps[step] = { status: 'pending' };
+  for (const step of (schema.step_order[pipelineStage] || [])) {
+    steps[step] = { status: 'pending', pipeline: pipelineStage };
   }
   return steps;
 }
@@ -82,7 +94,8 @@ function stateStep(args) {
   if (!state) exitError('state.json not found', [], 3);
 
   if (!state.steps[stepName]) {
-    state.steps[stepName] = {};
+    const pipeline = findPipelineForStep(schema, stepName, state);
+    state.steps[stepName] = { pipeline: pipeline };
   }
 
   const step = state.steps[stepName];
@@ -118,11 +131,17 @@ function stateAdvance(args) {
   if (!state) exitError('state.json not found', [], 3);
 
   const currentPipeline = state.pipeline_stage;
-  const currentSteps = stepsForPipeline(schema, currentPipeline);
+  const currentSteps = stepsForPipeline(schema, currentPipeline, state);
   const stepIndex = currentSteps.indexOf(stepName);
 
   if (stepIndex === -1) {
     exitError(`Step ${stepName} not found in current pipeline ${currentPipeline}`, currentSteps);
+  }
+
+  // Stage A approval: mark approved when advancing past it
+  if (stepName === 'stage-a' && state.approval) {
+    state.approval.stage_a_approved = true;
+    state.approval.stage_a_approved_at = timestamp();
   }
 
   // Check if this is the last step in the current pipeline
@@ -136,19 +155,24 @@ function stateAdvance(args) {
     }
 
     const nextPipeline = pipelines[pipelineIndex + 1];
-    const nextSteps = stepsForPipeline(schema, nextPipeline);
+    const nextSteps = stepsForPipeline(schema, nextPipeline, state);
 
     state.pipeline_stage = nextPipeline;
 
     // Initialize next pipeline's steps as pending
-    for (const step of nextSteps) {
+    const newSteps = initPipelineSteps(schema, nextPipeline);
+    for (const [step, info] of Object.entries(newSteps)) {
       if (!state.steps[step]) {
-        state.steps[step] = { status: 'pending' };
+        state.steps[step] = info;
       }
     }
 
-    // Set current_step to first step of next pipeline, or null if dynamic
-    state.current_step = nextSteps.length > 0 ? nextSteps[0] : null;
+    // Set current_step to first step of next pipeline
+    if (nextSteps.length > 0) {
+      state.current_step = nextSteps[0];
+    } else {
+      state.current_step = null;
+    }
 
     saveState(root, state);
     exitJSON({ success: true, advanced_to_pipeline: nextPipeline, current_step: state.current_step });
@@ -192,7 +216,8 @@ function stateReentry(args) {
     state.current_step = route.to;
 
     // Reset the target step to pending
-    state.steps[route.to] = { status: 'pending' };
+    const existingPipeline = state.steps[route.to] && state.steps[route.to].pipeline;
+    state.steps[route.to] = { status: 'pending', pipeline: existingPipeline || findPipelineForStep(schema, route.to, state) };
 
     // Clear approval
     if (state.approval) {
@@ -229,8 +254,8 @@ function stateReentry(args) {
     const currentStep = state.current_step;
 
     // Find the pipeline that contains the target step
-    const targetPipeline = findPipelineForStep(schema, targetStep);
-    const targetSteps = stepsForPipeline(schema, targetPipeline);
+    const targetPipeline = findPipelineForStep(schema, targetStep, state);
+    const targetSteps = stepsForPipeline(schema, targetPipeline, state);
 
     const targetIdx = targetSteps.indexOf(targetStep);
     const currentIdx = targetSteps.indexOf(currentStep);
@@ -241,7 +266,7 @@ function stateReentry(args) {
     for (let i = targetIdx; i <= endIdx; i++) {
       const step = targetSteps[i];
       if (state.steps[step]) {
-        state.steps[step] = { status: 'pending' };
+        state.steps[step] = { status: 'pending', pipeline: state.steps[step].pipeline };
       }
     }
 
@@ -289,12 +314,11 @@ function statePendingReentry(args) {
     exitError(`Unknown conflict type: ${conflictType}`, Object.keys(schema.reentry_routes));
   }
 
-  const targetStep = route.to;
-  const targetPipeline = findPipelineForStep(schema, targetStep);
-
   const root = getRoot();
   const state = loadState(root);
   if (!state) exitError('state.json not found', [], 3);
+  const targetStep = route.to;
+  const targetPipeline = findPipelineForStep(schema, targetStep, state);
 
   state.pending_reentry = {
     conflict_type: conflictType,
@@ -384,14 +408,14 @@ function stateInitCodeSteps(args) {
 
   for (let i = 0; i < units.length; i++) {
     const stepName = `unit-${i + 1}`;
-    steps[stepName] = { status: 'pending' };
+    steps[stepName] = { status: 'pending', pipeline: 'code' };
   }
 
   // Merge into state steps
   Object.assign(state.steps, steps);
 
   // Set current_step to first unit if not set
-  if (units.length > 0 && !state.current_step.startsWith('unit-')) {
+  if (units.length > 0 && (!state.current_step || !state.current_step.startsWith('unit-'))) {
     state.current_step = 'unit-1';
   }
 
