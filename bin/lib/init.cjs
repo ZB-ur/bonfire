@@ -32,7 +32,7 @@ function init(args) {
     pipeline_stage: 'pre',
     current_step: 'stage-a',
     steps: {
-      'stage-a': { status: 'pending' }
+      'stage-a': { status: 'pending', pipeline: 'pre' }
     },
     approval: {
       stage_a_approved: false,
