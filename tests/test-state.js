@@ -70,6 +70,9 @@ test('state-reentry resets steps from target to current', () => {
   assert.equal(state.steps['stage-d'].status, 'pending');
   assert.equal(state.steps['stage-e'].status, 'pending');
   assert.equal(state.steps['stage-b'].status, 'passed');
+  assert.equal(state.steps['stage-c'].pipeline, 'plan');
+  assert.equal(state.steps['stage-d'].pipeline, 'plan');
+  assert.equal(state.steps['stage-e'].pipeline, 'plan');
   assert.equal(state.reentry.depth, 1);
   fs.rmSync(dir, { recursive: true });
 });
@@ -86,6 +89,7 @@ test('state-reentry with goal_conflict crosses pipeline to pre', () => {
   assert.equal(state.pipeline_stage, 'pre');
   assert.equal(state.current_step, 'stage-a');
   assert.equal(state.approval.stage_a_approved, false);
+  assert.equal(state.steps['stage-a'].pipeline, 'pre');
   fs.rmSync(dir, { recursive: true });
 });
 
@@ -134,24 +138,61 @@ test('state-complete-run records completed run', () => {
   fs.rmSync(dir, { recursive: true });
 });
 
-test('state-advance from last plan step moves to code pipeline with null current_step', () => {
+test('init creates stage-a with pipeline pre', () => {
   const dir = makeTmpDir();
   initCase(dir);
-  // Advance from pre to plan
-  execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { cwd: dir });
-  execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { cwd: dir });
-  // Mark all plan steps as passed
-  for (const step of ['stage-b','stage-c','stage-d','stage-e','stage-f','stage-g','stage-h','stage-j']) {
-    execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { cwd: dir });
-  }
-  // Advance from stage-j (last step in plan) → should move to code pipeline
-  const stdout = execFileSync('node', [CLI, 'state-advance', '--step', 'stage-j'], { encoding: 'utf8', cwd: dir });
-  const result = JSON.parse(stdout);
-  assert.equal(result.advanced_to_pipeline, 'code');
+  const state = readState(dir);
+  assert.equal(state.steps['stage-a'].pipeline, 'pre');
+  fs.rmSync(dir, { recursive: true });
+});
 
+test('state-advance past stage-a sets approval', () => {
+  const dir = makeTmpDir();
+  initCase(dir);
+  execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { encoding: 'utf8', cwd: dir });
+  execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { encoding: 'utf8', cwd: dir });
+  const state = readState(dir);
+  assert.equal(state.approval.stage_a_approved, true);
+  assert.ok(state.approval.stage_a_approved_at);
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('state-advance from plan last step sets pipeline_stage to code', () => {
+  const dir = makeTmpDir();
+  initCase(dir);
+  execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { encoding: 'utf8', cwd: dir });
+  execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { encoding: 'utf8', cwd: dir });
+  const planSteps = ['stage-b', 'stage-c', 'stage-d', 'stage-e', 'stage-f', 'stage-g', 'stage-h', 'stage-j'];
+  for (const step of planSteps) {
+    execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'state-advance', '--step', step], { encoding: 'utf8', cwd: dir });
+  }
   const state = readState(dir);
   assert.equal(state.pipeline_stage, 'code');
   assert.equal(state.current_step, null);
-  assert.equal(state.steps['stage-j'].status, 'passed');
+  fs.rmSync(dir, { recursive: true });
+});
+
+test('state-init-code-steps creates unit steps with pipeline code', () => {
+  const dir = makeTmpDir();
+  initCase(dir);
+  execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { encoding: 'utf8', cwd: dir });
+  execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { encoding: 'utf8', cwd: dir });
+  const planSteps = ['stage-b', 'stage-c', 'stage-d', 'stage-e', 'stage-f', 'stage-g', 'stage-h', 'stage-j'];
+  for (const step of planSteps) {
+    execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'state-advance', '--step', step], { encoding: 'utf8', cwd: dir });
+  }
+  const coPath = path.join(dir, '.bonfire', 'plan', 'compile-output.json');
+  fs.writeFileSync(coPath, JSON.stringify({
+    units: [{ id: 'unit-1' }, { id: 'unit-2' }],
+    handoff: { code_ready: true, implementation_units: [{}, {}] }
+  }));
+  execFileSync('node', [CLI, 'state-init-code-steps'], { encoding: 'utf8', cwd: dir });
+  const state = readState(dir);
+  assert.equal(state.steps['unit-1'].pipeline, 'code');
+  assert.equal(state.steps['unit-2'].pipeline, 'code');
+  assert.equal(state.steps['unit-1'].status, 'pending');
+  assert.equal(state.current_step, 'unit-1');
   fs.rmSync(dir, { recursive: true });
 });
