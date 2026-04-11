@@ -257,10 +257,10 @@
     "blockers",
     "pause_conditions"
   ],
+  "pipeline_order": ["pre", "plan", "code", "achieve"],
   "step_order": {
     "pre":     ["stage-a"],
     "plan":    ["stage-b", "stage-c", "stage-d", "stage-e", "stage-f", "stage-g", "stage-h", "stage-j"],
-    "code":    [],
     "achieve": ["verify", "accept", "archive"]
   },
   "step_statuses": ["pending", "running", "awaiting_agent", "awaiting_user", "integrating", "gate_check", "passed", "gate_failed"]

@@ -120,3 +120,9 @@ test('schema preflight_mutable_fields has 6 entries', () => {
   const schema = loadSchema();
   assert.equal(schema.preflight_mutable_fields.length, 6);
 });
+
+test('schema has pipeline_order with 4 pipelines', () => {
+  const { loadSchema } = require('../bin/lib/utils.cjs');
+  const schema = loadSchema();
+  assert.deepStrictEqual(schema.pipeline_order, ['pre', 'plan', 'code', 'achieve']);
+});
