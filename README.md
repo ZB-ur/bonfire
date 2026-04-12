@@ -1,6 +1,6 @@
 # Bonfire
 
-把 AI coding 从开环祈祷变成闭环工程。
+把 AI coding 变成闭环工程。
 
 ---
 
