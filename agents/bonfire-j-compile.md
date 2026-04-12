@@ -16,7 +16,8 @@ Your job is to absorb the retained A–H result and compile it into a single fro
 - Compile in dependency order.
 - If H-Review had conditions, incorporate them explicitly.
 - Keep `handoff` as the only truthful `/code` entrypoint.
-- Companion sections (canonical_contracts, constraint_crosswalk, etc.) are inspection surfaces, not alternate sources of truth.
+- Companion sections (constraint_crosswalk, execution_manifest, code_batches, compile_summary, final_handoff) are inspection surfaces, not alternate sources of truth.
+- Each companion section MUST match the exact structure shown in output_format. The renderer validates field presence — structural deviations produce visible RENDER ERROR markers in bundle output.
 - Review the handoff quality bar (`@references/handoff-quality-bar.md`) before setting `code_ready=true`.
 - If any high-impact meaning is left to the coder, set `code_ready=false` and list gaps in `unresolved_gaps`.
 </rules>
@@ -77,10 +78,34 @@ Write `.bonfire/plan/compile-output.json` with this structure:
     "reentry_triggers": ["conditions that should halt coding and reenter planning"],
     "unresolved_gaps": []
   },
-  "canonical_contracts": { "extracted contract definitions" },
-  "constraint_crosswalk": { "constraint → implementation unit mapping" },
-  "execution_manifest": { "dependency-ordered execution plan" },
-  "code_batches": { "grouped implementation batches" },
+  "constraint_crosswalk": {
+    "mappings": [
+      {
+        "constraint_id": "CON-001",
+        "content": "Full constraint text copied from truth surface snapshot",
+        "unit_ids": ["unit-1", "unit-2"]
+      }
+    ]
+  },
+  "execution_manifest": {
+    "description": "Overall execution strategy description",
+    "waves": [
+      {
+        "wave": 1,
+        "units": "unit-1, unit-2",
+        "description": "Wave description"
+      }
+    ]
+  },
+  "code_batches": {
+    "batches": [
+      {
+        "batch_id": "batch_1_foundation",
+        "units": ["unit-1", "unit-2"],
+        "description": "Batch purpose and scope"
+      }
+    ]
+  },
   "code_preflight": {
     "confirmed_repo_facts": {},
     "do_not_reinterpret": [],
@@ -93,12 +118,26 @@ Write `.bonfire/plan/compile-output.json` with this structure:
     "blockers": [],
     "pause_conditions": []
   },
-  "compile_summary": "Summary of the compilation process",
-  "final_handoff": "Final readiness statement"
+  "compile_summary": {
+    "summary": "Summary of the compilation process and decisions made",
+    "code_ready": true,
+    "blockers": []
+  },
+  "final_handoff": {
+    "statement": "Final readiness statement for the coder",
+    "status": "code_ready"
+  }
 }
 ```
 
-The renderer will split this into 8 bundle markdown files (90, 91, 92, 95, 96, 97, 98, 99).
+**IMPORTANT:** The renderer splits this file into 8 bundle markdown files using the exact field names above. Each companion section MUST match this structure exactly:
+- `constraint_crosswalk.mappings` MUST be an array of `{constraint_id, content, unit_ids}`
+- `execution_manifest.waves[].units` MUST be a comma-separated string (not an array)
+- `code_batches.batches` MUST be an array of `{batch_id, units, description}`
+- `compile_summary` MUST be an object with `{summary, code_ready, blockers}`
+- `final_handoff` MUST be an object with `{statement, status}`
+
+Structural deviations produce visible `<!-- RENDER ERROR -->` markers in bundle output.
 </output_format>
 
 <input>
