@@ -126,13 +126,18 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
 31. Validate delta, write to `.bonfire/plan/bonfire-g-blue-delta.json`. Execute truth-update aligned_by for each alignment, truth-propose for new proposals.
 
 32. **Truth-Freeze Gate** (part of stage-g exit):
-    - Query CHALLENGED entries: `bonfire truth-query --status challenged`
-    - For each entry meeting maturity gate: `bonfire truth-freeze --id <id>`
-    - `high_impact_risk` entries stay OPEN (never freeze)
+    a. Query ALL non-frozen entries: `bonfire truth-query --status proposed` and `bonfire truth-query --status challenged`
+    b. For each CHALLENGED entry: `bonfire truth-freeze --id <id>`
+    c. For each PROPOSED entry (except category `high_impact_risk`):
+       - If `challenged_by` is empty (never challenged): freeze it — it survived adversarial review unchallenged
+       - If `challenged_by` is non-empty but entry also has `aligned_by`: freeze it — challenge was resolved
+       - Otherwise: explain why not frozen, or escalate
+    d. `high_impact_risk` entries stay OPEN (never freeze)
+    e. Verification: `bonfire truth-query --status proposed` — if count > 0, list each remaining PROPOSED entry and justify why it is not frozen before advancing
 
 33. Render: `bonfire render --note stage-g`
 
-34. Gate: red/blue complete + residual risks recorded + freeze done → advance
+34. Gate: red/blue complete + residual risks recorded + freeze verification passed → advance
 
 ## Stage H — Review
 
@@ -179,7 +184,18 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     bonfire handoff-validate
     ```
 
-44. Dual-write hook renders 8 markdown files to bundle/ (90, 91, 92, 95, 96, 97, 98, 99).
+44. Render all companion notes from compile-output.json:
+    ```
+    bonfire render --note code-handoff
+    bonfire render --note canonical-contracts
+    bonfire render --note constraint-crosswalk
+    bonfire render --note execution-manifest
+    bonfire render --note code-batches
+    bonfire render --note code-preflight
+    bonfire render --note compile-for-code
+    bonfire render --note final-handoff
+    ```
+    Or simply: `bonfire render --all`
 
 45. Gate: handoff passes validation, code_ready=true → advance
     - Gate failed: `state-reentry --conflict-type handoff_incomplete`, resume from stage-h

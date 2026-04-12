@@ -35,7 +35,7 @@ Optional fields: `proposals`, `follow_up_questions`
   "agent": "bonfire-g-blue",
   "proposals": [
     {
-      "id": "CON-NNN",
+      "id": "<PREFIX>-NNN",
       "category": "frozen_constraint|acceptance_semantic",
       "content": "Mitigation or monitoring constraint",
       "rationale": "How this addresses the attack"
@@ -52,6 +52,16 @@ Optional fields: `proposals`, `follow_up_questions`
   ]
 }
 ```
+
+ID naming convention — prefix MUST match category:
+- retained_goal: CON-NNN
+- frozen_constraint: CON-NNN (same prefix — distinguish by category field)
+- confirmed_fact: FACT-NNN
+- high_impact_risk: RISK-NNN
+- dependency_chain: DEP-NNN
+- acceptance_semantic: ACC-NNN
+- challenged_claim: CLAIM-NNN
+- discarded_option: DROP-NNN
 
 Validation: `bonfire-tools.cjs delta-validate --agent bonfire-g-blue`
 </delta_schema>
