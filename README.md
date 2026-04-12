@@ -6,7 +6,7 @@
 
 ## 问题：AI coding 的三代架构和各自的天花板
 
-### 第一代：Vibe Coding — 人肉开环
+### 第一代：Vibe Coding — 人工开环
 
 ```
 用户 prompt → AI 生成代码 → 人工审查 → 手动修正 → 重复
