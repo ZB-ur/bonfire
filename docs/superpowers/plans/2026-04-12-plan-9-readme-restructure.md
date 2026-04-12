@@ -1,3 +1,25 @@
+# README Restructure Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Rewrite README.md to match the structure and content defined in the design spec.
+
+**Architecture:** Single-file rewrite of README.md. No other files change. The new README reorganizes information by reader priority (what → how → why) instead of the current narrative order (why → what → how).
+
+**Tech Stack:** Markdown
+
+---
+
+### Task 1: Rewrite README.md
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: Replace README.md with the new content**
+
+Write the complete new README.md:
+
+````markdown
 # Bonfire
 
 让 AI 在合约下写代码，而不是猜你想要什么。
@@ -188,3 +210,29 @@ Bonfire 的设计借鉴了控制论和软件工程领域的经典工作：
 ## License
 
 MIT
+````
+
+- [ ] **Step 2: Verify the README renders correctly**
+
+Run: `cat -n README.md | head -20`
+Expected: First 20 lines show the new header and tagline, properly formatted.
+
+- [ ] **Step 3: Verify spec coverage**
+
+Check each spec section against the new README:
+1. Opening tagline: "让 AI 在合约下写代码，而不是猜你想要什么" ✓
+2. Quick start moved to position 2 ✓
+3. Usage fit section (new) ✓
+4. Core principles (4 concepts) ✓
+5. Pipeline overview with ASCII diagram and cybernetics role annotations ✓
+6. "Why Bonfire" compressed with Mosaicat one-liner ✓
+7. Project structure with corrected bin/ description ✓
+8. References trimmed to 7, sorted by theme ✓
+9. Terminology: cybernetics terms in English, rest in Chinese ✓
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add README.md
+git commit -m "docs: restructure README — reader-priority ordering, compressed problem section"
+```
