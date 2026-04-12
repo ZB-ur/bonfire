@@ -17,21 +17,64 @@ const { appendLog } = require('./logger.cjs');
  *   {{#each array}}...{{/each}} — array iteration
  *   {{.}}               — current element in primitive array iteration
  */
+/**
+ * Convert a non-array object to an array for {{#each}} iteration.
+ * Fallback safety net — correctly-shaped data should already be arrays.
+ *
+ * Rules:
+ *   {k: {a, b}} → [{key: k, a, b}]
+ *   {k: [...]}  → [{key: k, items: [...]}]
+ *   {k: "str"}  → [{key: k, value: "str"}]
+ *
+ * Logs a warning when triggered (soft algedonic signal).
+ */
+function objectToArray(obj, fieldName) {
+  if (typeof obj !== 'object' || obj === null) return [];
+  const result = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      result.push(Object.assign({ key: k }, v));
+    } else if (Array.isArray(v)) {
+      result.push({ key: k, items: v });
+    } else {
+      result.push({ key: k, value: v });
+    }
+  }
+  // Log warning — this fallback should not be the normal path
+  try {
+    const logDir = path.join(process.cwd(), '.bonfire', 'logs');
+    if (fs.existsSync(logDir)) {
+      appendLog(path.join(logDir, 'render.log'), {
+        level: 'warn',
+        message: 'objectToArray fallback triggered for field "' + fieldName + '"',
+      });
+    }
+  } catch (_) {
+    // Best-effort logging
+  }
+  return result;
+}
+
 function renderTemplate(template, data) {
   // Process {{#each arrayName}}...{{/each}} blocks
   const eachRe = /\{\{#each (\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g;
   let result = template.replace(eachRe, (_, arrayName, block) => {
-    const arr = data[arrayName];
-    if (!Array.isArray(arr) || arr.length === 0) return '';
+    const val = data[arrayName];
+    // Validation: undefined/null → RENDER ERROR
+    if (val === undefined || val === null) {
+      return '<!-- RENDER ERROR: missing required field "' + arrayName + '" in source data -->';
+    }
+    const arr = Array.isArray(val) ? val : objectToArray(val, arrayName);
+    if (arr.length === 0) return '';
     return arr.map(item => {
       if (typeof item === 'object' && item !== null) {
-        // Substitute {{field}} inside block using item's properties
         return block.replace(/\{\{(\w+)\}\}/g, (m, key) => {
-          const val = item[key];
-          return val === undefined || val === null ? '' : String(val);
+          const v = item[key];
+          if (v === undefined || v === null) return '';
+          if (Array.isArray(v)) return v.join(', ');
+          return String(v);
         });
       } else {
-        // Primitive — substitute {{.}}
         return block.replace(/\{\{\.\}\}/g, String(item));
       }
     }).join('');
@@ -40,7 +83,12 @@ function renderTemplate(template, data) {
   // Process remaining {{field}} substitutions from top-level data
   result = result.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const val = data[key];
-    return val === undefined || val === null ? '' : String(val);
+    // Validation: undefined/null → RENDER ERROR
+    if (val === undefined || val === null) {
+      return '<!-- RENDER ERROR: missing required field "' + key + '" in source data -->';
+    }
+    if (Array.isArray(val)) return val.join(', ');
+    return String(val);
   });
 
   return result;

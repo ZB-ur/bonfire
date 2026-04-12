@@ -25,9 +25,9 @@ test('renderTemplate handles {{.}} for primitive arrays', () => {
   assert.ok(result.includes('- beta'));
 });
 
-test('renderTemplate leaves unknown placeholders as empty', () => {
+test('renderTemplate produces RENDER ERROR for missing placeholders', () => {
   const result = renderTemplate('# {{title}}\n\n{{missing}}', { title: 'Test' });
-  assert.equal(result, '# Test\n\n');
+  assert.equal(result, '# Test\n\n<!-- RENDER ERROR: missing required field "missing" in source data -->');
 });
 
 test('renderNote renders constraint-ledger from snapshot', () => {
