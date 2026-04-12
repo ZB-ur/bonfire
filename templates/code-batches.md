@@ -5,10 +5,9 @@
 ## Batches
 
 {{#each batches}}
-### Batch {{batch_number}}: {{title}}
+### {{batch_id}}
 
 {{description}}
 
-**Units:** {{unit_ids}}
-**Verification:** {{verification}}
+**Units:** {{units}}
 {{/each}}

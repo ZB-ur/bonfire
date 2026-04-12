@@ -9,5 +9,4 @@
 
 **Constraint:** {{content}}
 **Implemented by:** {{unit_ids}}
-**Verified by:** {{verification}}
 {{/each}}

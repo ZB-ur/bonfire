@@ -82,7 +82,7 @@
       "id": "canonical-contracts",
       "filename": "91-canonical-contracts.md",
       "template": "canonical-contracts.md",
-      "source": "plan/compile-output.json#canonical_contracts",
+      "source": "plan/compile-output.json#handoff",
       "requires": ["code-handoff"]
     },
     {

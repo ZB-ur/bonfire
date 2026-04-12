@@ -2,12 +2,12 @@
 
 ← [[90-code-handoff]]
 
+{{description}}
+
 ## Execution Order
 
-{{#each phases}}
-### Phase {{phase_number}}: {{title}}
+{{#each waves}}
+### Wave {{wave}}: {{description}}
 
-{{#each units}}
-- **{{id}}**: {{title}} (depends on: {{depends_on}})
-{{/each}}
+**Units:** {{units}}
 {{/each}}
