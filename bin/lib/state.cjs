@@ -401,9 +401,12 @@ function stateInitCodeSteps(args) {
     exitError('plan/compile-output.json not found', [], 3);
   }
 
-  // Generate unit steps from compile output
-  // Expects compile_output to have a units array or similar
-  const units = compileOutput.units || compileOutput.code_batches || [];
+  // Generate unit steps from handoff.implementation_units
+  const handoff = compileOutput.handoff;
+  if (!handoff || !Array.isArray(handoff.implementation_units)) {
+    exitError('compile-output.json missing handoff.implementation_units', [], 3);
+  }
+  const units = handoff.implementation_units;
   const steps = {};
 
   for (let i = 0; i < units.length; i++) {

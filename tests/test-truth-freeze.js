@@ -183,6 +183,9 @@ test('supersede creates new FROZEN, old becomes SUPERSEDED', () => {
       category: 'retained_goal',
       content: 'Support 1k concurrent users.',
     });
+    // Must be FROZEN before supersede — challenge then freeze
+    update(root, { id: 'rg-010', field: 'challenged_by', value: 'test' });
+    freeze(root, { id: 'rg-010' });
 
     supersede(root, {
       supersedes: 'rg-010',

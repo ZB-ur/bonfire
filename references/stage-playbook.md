@@ -17,6 +17,13 @@ The constraint ledger snapshot (`constraint-ledger-snapshot.json`) is the machin
 
 After Stage A approval closes, user interaction should drop sharply. Stages B–H and J should converge in the background unless a new high-impact ambiguity or contradiction appears.
 
+## Truth Surface Mutation Rules
+
+When integrating agent deltas:
+
+- `truth-supersede` requires the old entry to be FROZEN. If the old entry is PROPOSED or CHALLENGED, use `truth-discard` on the old entry instead, then `truth-propose` the replacement as a new entry.
+- Always check CLI exit code after truth-* commands. Exit code 1 means validation failure — read the error JSON and take corrective action.
+
 ## A / Preprocess
 
 - Treat the raw request as unreliable input.

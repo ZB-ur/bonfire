@@ -185,8 +185,7 @@ test('state-init-code-steps creates unit steps with pipeline code', () => {
   }
   const coPath = path.join(dir, '.bonfire', 'plan', 'compile-output.json');
   fs.writeFileSync(coPath, JSON.stringify({
-    units: [{ id: 'unit-1' }, { id: 'unit-2' }],
-    handoff: { code_ready: true, implementation_units: [{}, {}] }
+    handoff: { code_ready: true, implementation_units: [{ id: 'unit-1' }, { id: 'unit-2' }] }
   }));
   execFileSync('node', [CLI, 'state-init-code-steps'], { encoding: 'utf8', cwd: dir });
   const state = readState(dir);

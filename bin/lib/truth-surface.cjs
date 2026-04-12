@@ -397,10 +397,16 @@ function supersede(root, opts) {
   if (!category) throw new Error('supersede: category is required');
   if (!content) throw new Error('supersede: content is required');
 
-  // Load current snapshot to verify old entry exists
+  // Load current snapshot to verify old entry exists and is FROZEN
   const snapshot = loadSnapshot(root) || replay(root);
   const oldEntry = (snapshot.entries || {})[supersedes];
   if (!oldEntry) throw new Error(`supersede: entry "${supersedes}" not found`);
+  if (oldEntry.status !== 'FROZEN') {
+    throw new Error(
+      `supersede: entry "${supersedes}" is ${oldEntry.status}, must be FROZEN. ` +
+      `Use truth-discard on the old entry, then truth-propose the replacement.`
+    );
+  }
 
   const historyPath = getHistoryPath(root);
   const event = {
