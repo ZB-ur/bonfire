@@ -1,68 +1,76 @@
 # Bonfire
 
-**AI coding 的根本问题不是代码写不好，而是决策不可控。**
+把 AI coding 从开环祈祷变成闭环工程。
 
-当你让 AI 写一个复杂系统时，真正的风险不是语法错误或 bug——这些可以调试。真正的风险是 AI 在编码过程中悄悄做出了高影响的产品决策：选择了错误的架构、遗漏了关键约束、把模糊需求按自己的理解实现了。等你发现时，代码已经写了几千行，推倒重来的成本远超从头开始。
+## 问题
 
-这是一个控制论问题：**系统的调节器（AI）缺乏反馈回路。** 它产出代码，但没有机制检测偏差、没有信号驱动纠偏、没有约束阻止漂移。
+你让 AI 写一个带用户认证的 REST API。几千行代码之后你发现：它把你的 session 存进了 localStorage 而不是 httpOnly cookie，因为"这样更简单"。它把密码哈希用了 MD5，因为你没说用 bcrypt。它把 API 从 REST 改成了 GraphQL，因为它觉得"更现代"。
 
-Bonfire 解决这个问题。
+这些不是 bug。Bug 可以调试。这些是 **AI 在编码过程中静默做出的产品决策**——你没有要求、没有审批、甚至没有意识到的决策。等你发现时，代码已经写完了。
 
-## 核心理念
+这就是 vibe coding 的系统性风险：prompt → code 之间没有约束传播。AI 的每一行代码背后都隐含着它自己做出的设计选择，而这些选择从不经过审查。
 
-### 问题：开环系统无法自我纠偏
+问题不止于此：
 
-传统 AI coding 工作流是开环的：
+- **开环执行**：发出指令，祈祷结果正确。没有反馈回路检测 AI 是否在正确的轨道上，直到最终交付。
+- **多 session 失忆**：上下文窗口是硬约束。上一个 session 讨论了 40 分钟的架构决策，下一个 session 全部忘记，从零开始猜测。
+- **多 agent 混沌**：4 个 agent 协作写代码，每个各自理解需求，输出不收敛。没有共享的 source of truth，只有各自的幻觉。
+
+这些问题的共同根源是一个控制论概念：**系统缺乏反馈回路。** AI 在持续产出，但没有机制检测偏差、没有信号驱动纠偏、没有约束阻止漂移。
+
+## Bonfire 的方法
+
+Bonfire 不是更好的 prompt engineering，不是另一个 AI wrapper。它是一套**约束传播系统**——借鉴控制论的工程学科方法，让 AI coding 过程中的每个决策都可追溯、可审查、可冻结。
+
+核心原则：**规划拥有语义，编码只拥有执行。**
 
 ```
-用户需求 → AI 编码 → 交付
+用户需求
+    │
+    ▼
+┌──────────┐     ┌─────────────────────────────────────┐
+│  Stage A  │────▶│         Truth Surface                │
+│  意图提取  │     │  (共享约束账本 — reference signal)   │
+└──────────┘     │                                      │
+                 │  PROPOSED → CHALLENGED → FROZEN      │
+                 └──────┬───────────────────┬───────────┘
+                        │                   │
+           ┌────────────▼────┐    ┌─────────▼──────────┐
+           │  Plan (B-J)     │    │  Code               │
+           │                 │    │                     │
+           │  D-Critique 攻击 │───▶│  Frozen handoff     │
+           │  G-Red 找漏洞   │    │  逐 unit 实现       │
+           │  G-Blue 防御    │    │  禁止发明决策        │
+           │  H-Review 裁决  │    │                     │
+           └────────┬────────┘    └─────────┬──────────┘
+                    │                       │
+                    │    reentry ◀───────────┘ 偏差 → 信号 → 纠偏
+                    │
+           ┌────────▼────────┐
+           │  Achieve        │
+           │  验收闭环        │
+           └─────────────────┘
 ```
 
-中间没有检测点。AI 做出的每个决策——选哪个库、数据模型怎么设计、边界条件怎么处理——都是单向的。你无法区分"AI 正确理解了需求"和"AI 自信地误解了需求"。
+**高影响决策在规划阶段冻结，编码阶段禁止发明。** 这不是建议——是硬边界。Coder agent 遇到 handoff 未覆盖的决策时，不能自己做主，必须触发 reentry 回到规划阶段。
 
-### 解法：闭环控制 + 对抗性审查
+## 核心概念
 
-Bonfire 将 AI coding 重构为闭环控制系统：
+### Truth Surface — 约束账本
 
-```
-          ┌─────────────────────────────┐
-          │     Truth Surface           │
-          │  (约束账本 — 所有决策的     │
-          │   生命周期记录)              │
-          └──────┬──────────────┬───────┘
-                 │              │
-    ┌────────────▼──┐    ┌─────▼────────────┐
-    │   规划阶段     │    │   编码阶段        │
-    │  4 个对抗性    │───▶│  frozen handoff   │
-    │  subagent 审查 │    │  逐 unit 实现     │
-    └────────────┬──┘    └─────┬────────────┘
-                 │              │
-                 │   reentry    │ 偏差检测
-                 │◀─────────────┘
-                 │
-          ┌──────▼──────────────────────┐
-          │     Algedonic Signal        │
-          │  (偏差 → 可见信号 → 纠偏)   │
-          └─────────────────────────────┘
-```
+所有决策的共享记录。每个条目都有生命周期：提出（PROPOSED）→ 被质疑（CHALLENGED）→ 冻结（FROZEN）或被取代（SUPERSEDED）。跨 session、跨 agent 持久化。不依赖任何人的记忆力。
 
-**三个控制论原则：**
+### 阶段门控 — 闭环反馈
 
-1. **Truth Surface（决策账本）**：每个决策都有完整生命周期——PROPOSED → CHALLENGED → FROZEN。不是"AI 决定了什么"，而是"这个决策经过了谁的审查、被谁质疑、为什么最终冻结"。
+每个 stage 的输出必须通过验证才能进入下一阶段。truth-freeze gate 要求所有 PROPOSED 条目要么被冻结、要么被显式拒绝——不允许"忘记处理"。
 
-2. **对抗性审查（Requisite Variety）**：D-Critique agent 攻击规划缺陷，G-Red agent 找漏洞，G-Blue agent 防御——然后 H-Review agent 做终审裁决。单一视角的审查无法发现系统性盲点，对抗性多视角可以。
+### 对抗性审查 — 扰动注入
 
-3. **Algedonic Signal（警报信号）**：偏差不会被静默吸收。编码偏离 handoff → 触发 reentry 回到规划阶段。渲染字段缺失 → 产生可见错误标记。truth surface 冲突 → 阻塞推进。每个偏差都产生信号，驱动系统自我纠偏。
+4 个 subagent 从不同角度审查同一个规划：D-Critique 攻击缺陷、G-Red 找安全和逻辑漏洞、G-Blue 防御并提出缓解方案、H-Review 做终审裁决。单一视角的审查看不到系统性盲点。
 
-## 和"让 AI 直接写代码"有什么不同？
+### 冻结语义 — 关注点分离
 
-| | 直接 AI 编码 | Bonfire |
-|--|-------------|---------|
-| 决策控制 | AI 编码时隐式决策，用户事后审查 | 高影响决策在规划阶段显式冻结，编码阶段禁止发明 |
-| 失败模式 | 发现问题时代码已写完，推倒重来 | reentry 机制在偏差发生时立即回退到对应阶段 |
-| 需求理解 | 一次性理解，理解偏差无限放大 | 4 个对抗性 agent 从不同角度审查，盲点被系统性暴露 |
-| 可追溯性 | 无——无法回答"为什么这样实现" | truth surface 记录每个决策的完整生命周期 |
-| 约束保持 | 依赖 AI 记忆力（不可靠） | 约束冻结后成为 frozen constraint，编码阶段硬性校验 |
+Frozen handoff 是编码阶段的**唯一输入**。它不是参考文档——是合约。哪些决策已经做出、哪些边界不可逾越、哪些低影响选择留给 coder 自行判断，全部写死在 handoff 中。
 
 ## 快速开始
 
@@ -83,11 +91,12 @@ bash install.sh
 
 在任意项目目录中启动 Claude Code：
 
-```bash
+```
 /bonfire:pre     # 初始化案例，运行预处理与审批
-/bonfire:plan    # 运行对抗性规划 pipeline
+/bonfire:plan    # 运行对抗性规划 pipeline（Stage B-J）
 /bonfire:code    # 基于 frozen handoff 编码
 /bonfire:achieve # 验收闭环
+/bonfire:render  # 渲染 markdown bundle
 ```
 
 ### 卸载
@@ -97,43 +106,39 @@ cd bonfire
 bash uninstall.sh
 ```
 
-## Pipeline
+## Pipeline 概览
 
-```
-pre (Stage A)  →  plan (Stage B-J)  →  code  →  achieve
-```
+### Pre — Stage A
 
-### Pre — 提取意图，建立 truth surface
+提取用户意图、验证 repo 事实、识别盲点。生成 truth surface 初始快照。**需要用户显式批准后才能进入规划。**
 
-Stage A：提取用户意图、验证 repo 事实、识别盲点。生成 truth surface 初始快照。**需要用户显式批准后才能进入规划。**
-
-### Plan — 对抗性规划（8 个 stage）
+### Plan — Stage B 到 J
 
 | Stage | 说明 |
 |-------|------|
 | B Divergence | 生成 3+ 方案，保留最优路径 |
-| C Requirements | 分解为需求单元，定义验收标准 |
+| C Requirements | 分解需求单元，定义验收标准 |
 | D Critique | D-Critique agent 攻击规划缺陷 |
 | E Closure | 依赖链闭合 |
 | F Probes | 可执行验证（repo 检查、脚本测试） |
-| G Red-Blue | G-Red 找漏洞，G-Blue 防御，truth-freeze gate |
-| H Review | H-Review 终审裁决（approve / reject / reentry） |
-| J Compile | 编译 frozen handoff（编码阶段的唯一输入） |
+| G Red-Blue | G-Red 找漏洞、G-Blue 防御、truth-freeze gate |
+| H Review | 终审裁决：approve / reject / reentry |
+| J Compile | 编译 frozen handoff |
 
-### Code — frozen handoff 驱动编码
+### Code
 
-Coder agent 逐 unit 实现，evaluator agent 逐 unit 验证。偏离 handoff 触发 reentry 回到规划阶段。Coder **禁止发明高影响产品决策**——这些在规划阶段已经冻结。
+Coder agent 逐 unit 实现，evaluator agent 逐 unit 验证。偏离 handoff 触发 reentry。
 
-### Achieve — 验收闭环
+### Achieve
 
-对照 acceptance semantics 逐条验证交付物，生成最终裁定。
+对照 acceptance semantics 逐条验证交付物。
 
 ## 项目结构
 
 ```
 bonfire/
 ├── bin/            CLI 工具（30+ 命令）
-├── skills/         5 个 skill（pre/plan/code/achieve/render）
+├── skills/         5 个 skill（pre / plan / code / achieve / render）
 ├── agents/         10 个对抗性 subagent
 ├── references/     共享知识文档（playbook、quality bar）
 ├── schemas/        pipeline schema 定义
@@ -147,7 +152,6 @@ bonfire/
 ## 开发
 
 ```bash
-# 运行测试
 node --test tests/*.js
 ```
 
