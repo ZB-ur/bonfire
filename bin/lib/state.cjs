@@ -76,9 +76,20 @@ function checkStageGInvariant() {
   const snapshot = loadSnapshot(dir);
   const entries = (snapshot && snapshot.entries) || {};
 
+  // Categories that cannot be frozen (can_freeze: false in schema) are expected
+  // to remain in their terminal-per-category status and must not block advance.
+  // Today this covers: high_impact_risk (OPEN), challenged_claim (CHALLENGED),
+  // discarded_option (DISCARDED).
+  const schema = getSchema();
+  const noFreezeCategories = new Set(
+    Object.entries(schema.categories || {})
+      .filter(([_, cfg]) => cfg && cfg.can_freeze === false)
+      .map(([name]) => name)
+  );
+
   const unresolved = [];
   for (const [id, entry] of Object.entries(entries)) {
-    if (entry.category === 'high_impact_risk') continue;
+    if (noFreezeCategories.has(entry.category)) continue;
     if (entry.status === 'PROPOSED' || entry.status === 'CHALLENGED') {
       unresolved.push(id);
     }

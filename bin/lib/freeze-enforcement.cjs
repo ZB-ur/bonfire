@@ -32,8 +32,16 @@ function stageGFreezeGate(root) {
     unresolved: [],     // CHALLENGED ids without alignment — BLOCKING
   };
 
+  const { loadSchema } = require('./utils.cjs');
+  const schema = loadSchema();
+  const noFreezeCategories = new Set(
+    Object.entries((schema && schema.categories) || {})
+      .filter(([_, cfg]) => cfg && cfg.can_freeze === false)
+      .map(([name]) => name)
+  );
+
   for (const [id, entry] of Object.entries(entries)) {
-    if (entry.category === 'high_impact_risk') {
+    if (noFreezeCategories.has(entry.category)) {
       summary.skippedRisk.push(id);
       continue;
     }

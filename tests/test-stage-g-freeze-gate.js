@@ -128,3 +128,21 @@ test('stage-g-freeze-gate is a no-op on an empty ledger', () => {
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('stage-g-freeze-gate skips all can_freeze=false categories (not just high_impact_risk)', () => {
+  const dir = makeTmpDir();
+  try {
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CC-TWO', '--category', 'challenged_claim',
+      '--content', 'contested claim', '--rationale', 'r', '--source', 'stage-d'],
+      { encoding: 'utf8', cwd: dir });
+
+    const result = runGate(dir);
+    assert.equal(result.code, 0, 'can_freeze=false entries should not cause gate failure');
+
+    const snap = readSnapshot(dir);
+    assert.equal(snap.entries['CC-TWO'].status, 'CHALLENGED', 'challenged_claim status preserved');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});

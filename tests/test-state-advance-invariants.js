@@ -325,3 +325,22 @@ test('state-advance from stage-h distinguishes missing vs corrupted verdict file
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('state-advance from stage-g allows when only can_freeze=false categories are unresolved (challenged_claim)', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageG(dir);
+    // challenged_claim has initial status CHALLENGED per CATEGORY_INITIAL_STATUS;
+    // can_freeze: false in the schema, so stage-g cannot freeze it, but the
+    // invariant must not block advance on it either.
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CC-ONE', '--category', 'challenged_claim',
+      '--content', 'x', '--rationale', 'r', '--source', 'stage-d'],
+      { encoding: 'utf8', cwd: dir });
+
+    const result = runAdvance(dir, 'stage-g');
+    assert.equal(result.code, 0, 'challenged_claim should not block stage-g advance');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
