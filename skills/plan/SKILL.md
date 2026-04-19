@@ -153,6 +153,16 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     bonfire delta-validate --agent bonfire-h-review --file .bonfire/plan/h-review-verdict.json
     ```
 
+37b. **Validate conditions:** `state-advance --step stage-h` now runs Layer 1 automatically
+     (`validate-h-conditions`). If the verdict has `approved_with_conditions` with any
+     condition whose `target_stage` is not `stage-j`, or any condition containing a
+     blacklisted verb, or any orphan substantive token relative to the FROZEN ledger,
+     state-advance will exit non-zero with `conflict_type: invalid_stage_j_condition`.
+     Do NOT retry H-Review with the same prompt — include the validation failures in
+     the agent input so it produces a different verdict shape. Run
+     `bonfire state-reentry --conflict-type invalid_stage_j_condition`, then resume
+     from stage-h.
+
 38. **Apply rulings:** run `bonfire apply-h-rulings`.
     - Exit 0 → all freeze/supersede rulings are materialized in the
       ledger (auto-alignment via `stage-h-ruling` token is handled
@@ -170,6 +180,10 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     - `rejected` → `bonfire state-reentry --conflict-type <verdict.conflict_type>`, log, resume from target step
 
     Note: `state-advance --step stage-h` enforces that every `freeze`/`supersede` ruling in the verdict is satisfied by the current ledger snapshot. A verdict with empty `rulings` passes trivially; redundant rulings (target already FROZEN by Stage G) are trivially satisfied without requiring `apply-h-rulings`.
+
+    Note: state-advance --step stage-h now enforces three invariants mechanically:
+    (1) schema validation of the verdict, (2) Layer 1 condition validation (Task 37b),
+    (3) rulings materialized in the ledger. Failure on any of the three blocks advance.
 
 ## Stage J — Compile
 
