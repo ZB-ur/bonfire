@@ -95,3 +95,107 @@ test('state-advance from stage-g allows after stage-g-freeze-gate runs successfu
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+// ─── Stage H invariant ───────────────────────────────────────────────────────
+
+function setPipelineToStageH(dir) {
+  const statePath = path.join(dir, '.bonfire', 'state.json');
+  const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  state.pipeline_stage = 'plan';
+  state.current_step = 'stage-h';
+  for (const step of ['stage-b', 'stage-c', 'stage-d', 'stage-e', 'stage-f', 'stage-g']) {
+    state.steps[step] = { status: 'passed', pipeline: 'plan', passed_at: new Date().toISOString() };
+  }
+  state.steps['stage-h'] = { status: 'running', pipeline: 'plan', started_at: new Date().toISOString() };
+  state.approval = state.approval || {};
+  state.approval.stage_a_approved = true;
+  state.approval.stage_a_approved_at = new Date().toISOString();
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
+function writeVerdict(dir, rulings) {
+  const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+  fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+  fs.writeFileSync(verdictPath, JSON.stringify({
+    verdict: 'approved_with_conditions',
+    reason: 'test',
+    rulings,
+  }, null, 2));
+}
+
+test('state-advance from stage-h blocks when rulings are unsatisfied', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-UNSAT', '--category', 'retained_goal',
+      '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-UNSAT' }]);
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.notEqual(result.code, 0);
+    const out = result.stdout + result.stderr;
+    assert.match(out, /CON-UNSAT/);
+    assert.match(out, /expected=FROZEN/);
+    assert.match(out, /actual=PROPOSED/);
+    assert.match(out, /apply-h-rulings/);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('state-advance from stage-h allows when all rulings satisfied by apply-h-rulings', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-APPLIED', '--category', 'retained_goal',
+      '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-APPLIED' }]);
+    execFileSync('node', [CLI, 'apply-h-rulings'], { encoding: 'utf8', cwd: dir });
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.equal(result.code, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('state-advance from stage-h allows when verdict has empty rulings', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    writeVerdict(dir, []);
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.equal(result.code, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('state-advance from stage-h allows when ruling is redundant (target already FROZEN)', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-PRE', '--category', 'retained_goal',
+      '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-update',
+      '--id', 'CON-PRE', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-PRE'],
+      { encoding: 'utf8', cwd: dir });
+
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-PRE' }]);
+    // No apply-h-rulings — target was already frozen by stage-g.
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.equal(result.code, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});

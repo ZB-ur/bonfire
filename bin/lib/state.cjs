@@ -96,6 +96,54 @@ function checkStageGInvariant() {
   }
 }
 
+function checkStageHInvariant() {
+  const { loadSnapshot } = require('./truth-surface.cjs');
+  const root = getRoot();
+  const dir = path.dirname(root);
+  const verdictPath = path.join(root, 'plan', 'h-review-verdict.json');
+
+  const verdict = loadJSON(verdictPath);
+  if (!verdict) exitError(`h-review-verdict.json not found at ${verdictPath}`, [], 3);
+
+  const rulings = Array.isArray(verdict.rulings) ? verdict.rulings : [];
+  const filtered = rulings.filter(r => r.action === 'freeze' || r.action === 'supersede');
+  if (filtered.length === 0) return;  // trivial pass
+
+  const snapshot = loadSnapshot(dir);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  const failures = [];
+  for (const ruling of filtered) {
+    if (ruling.action === 'freeze') {
+      const actual = entries[ruling.id] && entries[ruling.id].status;
+      if (actual !== 'FROZEN') {
+        failures.push(`  - freeze(id=${ruling.id}) expected=FROZEN actual=${actual || '<missing>'}`);
+      }
+    } else if (ruling.action === 'supersede') {
+      const oldStatus = entries[ruling.supersedes] && entries[ruling.supersedes].status;
+      const newStatus = entries[ruling.id] && entries[ruling.id].status;
+      const oldOk = oldStatus === 'SUPERSEDED';
+      const newOk = newStatus === 'FROZEN';
+      if (!oldOk || !newOk) {
+        failures.push(
+          `  - supersede(supersedes=${ruling.supersedes}, id=${ruling.id}) ` +
+          `expected: ${ruling.supersedes}=SUPERSEDED, ${ruling.id}=FROZEN; ` +
+          `actual: ${ruling.supersedes}=${oldStatus || '<missing>'}, ${ruling.id}=${newStatus || '<missing>'}`
+        );
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    process.stderr.write(
+      `Cannot advance from stage-h: ${failures.length} rulings not satisfied:\n`
+    );
+    process.stderr.write(failures.join('\n') + '\n');
+    process.stderr.write(`Run: bonfire apply-h-rulings\n`);
+    process.exit(1);
+  }
+}
+
 // ─── Exported command handlers ────────────────────────────────────────────────
 
 function stateRead(args) {
@@ -157,6 +205,8 @@ function stateAdvance(args) {
   // Invariant gates: refuse to advance when ledger state violates contract.
   if (stepName === 'stage-g') {
     checkStageGInvariant();
+  } else if (stepName === 'stage-h') {
+    checkStageHInvariant();
   }
 
   const schema = getSchema();
