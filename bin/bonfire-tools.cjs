@@ -249,9 +249,18 @@ function stageGFreezeGateCommand(args) {
 }
 
 function applyHRulingsCommand(args) {
-  // Implementation added in Task 3.
-  const { exitError } = require('./lib/utils.cjs');
-  exitError('apply-h-rulings not yet implemented', []);
+  const { applyHRulings } = require('./lib/freeze-enforcement.cjs');
+  const { resolveRoot, exitJSON, exitError } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+
+  try {
+    const result = applyHRulings(dir);
+    exitJSON(result, 0);
+  } catch (err) {
+    exitError(err.message, []);
+  }
 }
 
 function main() {

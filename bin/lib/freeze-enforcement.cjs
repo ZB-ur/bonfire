@@ -73,8 +73,129 @@ function stageGFreezeGate(root) {
   return summary;
 }
 
+/**
+ * Apply all freeze/supersede rulings from an h-review-verdict.json file.
+ *
+ * Classification:
+ *   1. filter rulings[] to action ∈ {freeze, supersede}
+ *   2. freeze rulings whose target is already FROZEN → idempotent skip
+ *   3. everything else → pre-validation (target exists, supersede preconditions)
+ *   4. if pre-validation fails on any non-skip ruling → throw without writing
+ *   5. otherwise emit planned events (update aligned_by + freeze, or supersede)
+ */
+function applyHRulings(root) {
+  const { validateDelta } = require('./delta-parser.cjs');
+  const { supersede } = require('./truth-surface.cjs');
+  const fs = require('fs');
+
+  const verdictPath = path.join(root, '.bonfire', 'plan', 'h-review-verdict.json');
+  let verdict;
+  try {
+    verdict = JSON.parse(fs.readFileSync(verdictPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`Cannot read verdict at ${verdictPath}: ${err.message}`);
+  }
+
+  const validation = validateDelta('bonfire-h-review', verdict);
+  if (!validation.valid) {
+    throw new Error('Verdict failed schema validation: ' + validation.errors.join('; '));
+  }
+
+  const rulings = Array.isArray(verdict.rulings) ? verdict.rulings : [];
+  const filtered = rulings.filter(r => r.action === 'freeze' || r.action === 'supersede');
+
+  const snapshot = loadSnapshot(root);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  // Classify
+  const skips = [];       // { id }
+  const toExecute = [];   // { ruling, plan: 'freeze-with-align' | 'freeze' | 'supersede' }
+  const failures = [];    // { ruling, reason }
+
+  for (const ruling of filtered) {
+    if (ruling.action === 'freeze') {
+      const entry = entries[ruling.id];
+      if (!entry) {
+        failures.push({ ruling, reason: `target id "${ruling.id}" does not exist` });
+        continue;
+      }
+      if (entry.status === 'FROZEN') {
+        skips.push({ id: ruling.id });
+        continue;
+      }
+      // Plan auto-alignment if challenged_by empty; freeze either way.
+      const challengedByEmpty = !Array.isArray(entry.challenged_by) || entry.challenged_by.length === 0;
+      toExecute.push({
+        ruling,
+        plan: challengedByEmpty ? 'freeze-with-align' : 'freeze',
+      });
+      continue;
+    }
+
+    if (ruling.action === 'supersede') {
+      const oldEntry = entries[ruling.supersedes];
+      if (!oldEntry) {
+        failures.push({ ruling, reason: `supersedes target "${ruling.supersedes}" does not exist` });
+        continue;
+      }
+      if (oldEntry.status !== 'FROZEN') {
+        failures.push({ ruling, reason: `supersedes target "${ruling.supersedes}" must be FROZEN (is ${oldEntry.status})` });
+        continue;
+      }
+      if (entries[ruling.id]) {
+        failures.push({ ruling, reason: `new id "${ruling.id}" already exists` });
+        continue;
+      }
+      if (!ruling.content || !ruling.category) {
+        failures.push({ ruling, reason: `supersede ruling missing content or category` });
+        continue;
+      }
+      toExecute.push({ ruling, plan: 'supersede' });
+    }
+  }
+
+  if (failures.length > 0) {
+    const msg = failures.map(f => {
+      const rid = f.ruling.id || (f.ruling.supersedes ? `supersede(${f.ruling.supersedes})` : '<unknown>');
+      return `  - ${rid}: ${f.reason}`;
+    }).join('\n');
+    throw new Error(`apply-h-rulings pre-validation failed:\n${msg}`);
+  }
+
+  // Execute — mutations happen here. Failures above guarantee this phase writes
+  // no partial events.
+  for (const item of toExecute) {
+    const { ruling, plan } = item;
+    if (plan === 'freeze-with-align') {
+      update(root, { id: ruling.id, field: 'aligned_by', value: TOKEN_STAGE_H });
+      freeze(root, { id: ruling.id });
+    } else if (plan === 'freeze') {
+      freeze(root, { id: ruling.id });
+    } else if (plan === 'supersede') {
+      supersede(root, {
+        id: ruling.id,
+        supersedes: ruling.supersedes,
+        category: ruling.category,
+        content: ruling.content,
+        source: ruling.source || 'h-review',
+        rationale: ruling.rationale || null,
+      });
+    }
+  }
+
+  return {
+    applied: toExecute.map(t => ({
+      id: t.ruling.id,
+      action: t.ruling.action,
+      autoAligned: t.plan === 'freeze-with-align',
+    })),
+    skipped: skips,
+  };
+}
+
 module.exports = {
   stageGFreezeGate,
+  applyHRulings,
   TOKEN_STAGE_G,
   TOKEN_STAGE_H,
 };
