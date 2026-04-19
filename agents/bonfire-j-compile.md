@@ -22,6 +22,48 @@ Your job is to absorb the retained A–H result and compile it into a single fro
 - If any high-impact meaning is left to the coder, set `code_ready=false` and list gaps in `unresolved_gaps`.
 </rules>
 
+<provenance_rules>
+Every substantive slot in your compile-output (per
+`handoff_substantive_slots` in the schema — domain_model.entities,
+function_contracts, data_contract, ui_contract.panels,
+ui_contract.state_ownership, ui_contract.empty_states,
+ui_contract.error_states) MUST carry:
+
+  - `source_kind`: either `ledger_direct` or `condition_rewrite`
+  - `source_ref`: the FROZEN ledger id (for ledger_direct), or
+    `{ condition_index: <int> }` (for condition_rewrite)
+
+You MUST NOT produce content whose substantive tokens do not appear
+in the declared source. `handoff-validate` (Layer 2b) will reject
+orphan tokens and the package will be bounced back to H-Review — not
+to you. Do not save yourself the bounce by inventing content that
+coincidentally uses source tokens; the diff is mechanical and will
+catch you.
+
+If a condition asks you to produce content for which no source is
+adequate (the condition passed Layer 1 entry check but in execution
+you find no way to write the slot without inventing), do NOT produce
+a pass-through compile-output. Instead, emit a top-level
+`reentry_request` field:
+
+```json
+{
+  "handoff": { "code_ready": false, ... },
+  "reentry_request": {
+    "conflict_type": "invalid_stage_j_condition",
+    "reason": "condition[<index>] '<excerpt>' requires inventing <what> — no adequate source coverage"
+  }
+}
+```
+
+`reentry_request` is a SIBLING of `handoff` at the compile-output
+root — NOT nested inside handoff. `handoff-validate` detects this
+shape and triggers the declared reentry back to stage-h. When you
+declare a reentry, `handoff.code_ready` MUST be `false`. Inventing
+content to hide an inadequacy or setting `code_ready=true` alongside
+a reentry_request are both forbidden.
+</provenance_rules>
+
 <output_format>
 Write `.bonfire/plan/compile-output.json` with this structure:
 
@@ -36,9 +78,9 @@ Write `.bonfire/plan/compile-output.json` with this structure:
     "repo_grounding": { "key facts about repo state" },
     "read_first": ["files the coder should read before starting"],
     "frozen_product_decisions": ["decisions that may not drift"],
-    "domain_model": { "entities, fields, states, invariants" },
-    "data_contract": { "persistence/API behavior" },
-    "ui_contract": { "routes, panels, forms, states" },
+    "domain_model": { "entities, fields, states, invariants — each entity MUST have source_kind + source_ref" },
+    "data_contract": { "persistence/API behavior — MUST have source_kind + source_ref" },
+    "ui_contract": { "routes, panels, forms, states — panels/state_ownership/empty_states/error_states MUST have source_kind + source_ref" },
     "function_contracts": [
       {
         "id": "FC-001",
@@ -51,7 +93,9 @@ Write `.bonfire/plan/compile-output.json` with this structure:
         "outputs": ["return value descriptions"],
         "side_effects": ["side effects"],
         "invariants": ["must always be true"],
-        "failure_modes": ["what can go wrong"]
+        "failure_modes": ["what can go wrong"],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-XXX"
       }
     ],
     "file_plan": [
@@ -78,6 +122,7 @@ Write `.bonfire/plan/compile-output.json` with this structure:
     "reentry_triggers": ["conditions that should halt coding and reenter planning"],
     "unresolved_gaps": []
   },
+  "reentry_request": null,
   "constraint_crosswalk": {
     "mappings": [
       {
@@ -136,6 +181,7 @@ Write `.bonfire/plan/compile-output.json` with this structure:
 - `code_batches.batches` MUST be an array of `{batch_id, units, description}`
 - `compile_summary` MUST be an object with `{summary, code_ready, blockers}`
 - `final_handoff` MUST be an object with `{statement, status}`
+- `reentry_request` is a top-level sibling of `handoff` (NOT nested inside it). Optional. When present, `handoff.code_ready` MUST be `false`. Triggers reentry to stage-h via `invalid_stage_j_condition`.
 
 Structural deviations produce visible `<!-- RENDER ERROR -->` markers in bundle output.
 </output_format>
