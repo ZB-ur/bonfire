@@ -125,19 +125,16 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
 
 31. Validate delta, write to `.bonfire/plan/bonfire-g-blue-delta.json`. Execute truth-update aligned_by for each alignment, truth-propose for new proposals.
 
-32. **Truth-Freeze Gate** (part of stage-g exit):
-    a. Query ALL non-frozen entries: `bonfire truth-query --status proposed` and `bonfire truth-query --status challenged`
-    b. For each CHALLENGED entry: `bonfire truth-freeze --id <id>`
-    c. For each PROPOSED entry (except category `high_impact_risk`):
-       - If `challenged_by` is empty (never challenged): freeze it — it survived adversarial review unchallenged
-       - If `challenged_by` is non-empty but entry also has `aligned_by`: freeze it — challenge was resolved
-       - Otherwise: explain why not frozen, or escalate
-    d. `high_impact_risk` entries stay OPEN (never freeze)
-    e. Verification: `bonfire truth-query --status proposed` — if count > 0, list each remaining PROPOSED entry and justify why it is not frozen before advancing
+32. **Truth-Freeze Gate:** run `bonfire stage-g-freeze-gate`.
+    - Exit 0 → all eligible PROPOSED/CHALLENGED entries are now FROZEN
+      (high_impact_risk stays OPEN by design).
+    - Non-zero exit → the command lists CHALLENGED entries without
+      alignment. Return these to G-Blue for defense, or escalate to
+      H-Review. Do not proceed until the command exits 0.
 
 33. Render: `bonfire render --note stage-g`
 
-34. Gate: red/blue complete + residual risks recorded + freeze verification passed → advance
+34. Gate: red/blue complete + residual risks recorded + freeze verification passed → advance. `state-advance --step stage-g` now enforces the invariant: if any entry is still PROPOSED or CHALLENGED (excluding `high_impact_risk`), advance is refused and the command prints the offending ids.
 
 ## Stage H — Review
 
@@ -156,9 +153,14 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     bonfire delta-validate --agent bonfire-h-review --file .bonfire/plan/h-review-verdict.json
     ```
 
-38. Execute rulings:
-    - For each `{ "action": "freeze", "id": "..." }`: `truth-freeze --id <id>`
-    - For each `{ "action": "supersede", ... }`: `truth-supersede --id <new> --supersedes <old> ...`
+38. **Apply rulings:** run `bonfire apply-h-rulings`.
+    - Exit 0 → all freeze/supersede rulings are materialized in the
+      ledger (auto-alignment via `stage-h-ruling` token is handled
+      internally for unchallenged targets).
+    - Non-zero exit → pre-validation surfaced a problem (missing id,
+      supersede precondition, etc.). Inspect stderr, revise the verdict
+      if the rulings themselves are wrong, and re-run. Do not retry
+      blindly.
 
 39. Render: `bonfire render --note stage-h`
 
@@ -166,6 +168,8 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     - `approved` → advance to stage-j
     - `approved_with_conditions` → record conditions, advance to stage-j
     - `rejected` → `bonfire state-reentry --conflict-type <verdict.conflict_type>`, log, resume from target step
+
+    Note: `state-advance --step stage-h` enforces that every `freeze`/`supersede` ruling in the verdict is satisfied by the current ledger snapshot. A verdict with empty `rulings` passes trivially; redundant rulings (target already FROZEN by Stage G) are trivially satisfied without requiring `apply-h-rulings`.
 
 ## Stage J — Compile
 
