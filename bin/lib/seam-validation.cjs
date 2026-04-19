@@ -18,8 +18,13 @@ function loadFormatWhitelist() {
   for (const rawLine of source.split('\n')) {
     const line = rawLine.trim();
     if (line === '' || line.startsWith('#') || line.startsWith('---')) continue;
-    // Skip markdown headers (lines starting with ##, or marked **...**)
-    if (line.startsWith('**') && line.endsWith('**')) continue;
+    // Skip any prose line that begins with a bold label (e.g. `**Purpose:** ...`)
+    // or a backticked code reference — these are documentation, not whitelist
+    // content. The original `startsWith('**') && endsWith('**')` check missed
+    // lines with trailing punctuation (period, colon), leaking prose tokens
+    // like "words", "tokens", "logical", "group" into the whitelist.
+    if (line.startsWith('**')) continue;
+    if (line.startsWith('`')) continue;
     // Each whitespace-separated token becomes an entry
     for (const token of line.split(/\s+/)) {
       if (token && !token.startsWith('#')) {

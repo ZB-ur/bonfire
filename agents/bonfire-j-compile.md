@@ -58,10 +58,14 @@ a pass-through compile-output. Instead, emit a top-level
 
 `reentry_request` is a SIBLING of `handoff` at the compile-output
 root — NOT nested inside handoff. `handoff-validate` detects this
-shape and triggers the declared reentry back to stage-h. When you
-declare a reentry, `handoff.code_ready` MUST be `false`. Inventing
-content to hide an inadequacy or setting `code_ready=true` alongside
-a reentry_request are both forbidden.
+shape, flags the verdict as needing reentry, and surfaces the
+`conflict_type` in its output. Skill-level routing (e.g., the
+`/bonfire:plan` skill's Stage J step) is responsible for invoking
+`bonfire state-reentry --conflict-type <type>` based on that signal.
+J-Compile's job is to emit the signal correctly; it does not perform
+the reentry itself. When you declare a reentry, `handoff.code_ready`
+MUST be `false`. Inventing content to hide an inadequacy or setting
+`code_ready=true` alongside a reentry_request are both forbidden.
 </provenance_rules>
 
 <output_format>

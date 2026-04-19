@@ -33,6 +33,33 @@ test('loadFormatWhitelist skips comment lines and whitespace', () => {
   }
 });
 
+test('loadFormatWhitelist does not leak markdown header or bold-label prose', () => {
+  // Regression guard: the loader previously only skipped lines where
+  // `line.startsWith('**') && line.endsWith('**')`, which missed prose
+  // labels with trailing punctuation (e.g. `**Purpose:** Tokens exempt...`).
+  // That leaked prose tokens like "words", "tokens", "logical" into the
+  // whitelist, silently authorizing them as Layer 1/2b format keywords.
+  // These tokens would only appear in the whitelist if the loader
+  // re-regressed to tokenizing prose lines.
+  const whitelist = loadFormatWhitelist();
+  const proseLeaks = [
+    'words',                   // from "structure/format words that appear..."
+    'tokens',                  // from "**Purpose:** Tokens exempt..."
+    'exempt',
+    'orphan-token',
+    'structure/format',
+    'whitespace-separated',    // from "**Loaded by:** ... Whitespace-separated tokens..."
+    'logical',
+    'beginning',
+    'comments',
+    'purpose',
+    'structure',               // from "## Structure words" header if ever tokenized
+  ];
+  for (const token of proseLeaks) {
+    assert.equal(whitelist.has(token), false, `prose token leaked into whitelist: "${token}"`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // extractSubstantiveTokens
 // ---------------------------------------------------------------------------
