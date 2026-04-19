@@ -1,0 +1,18 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "x",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "unit-1" }],
+    "ui_contract": {
+      "panels": {
+        "Home": {
+          "description": "开始训练 和 重置统计",
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-007"
+        }
+      }
+    }
+  }
+}

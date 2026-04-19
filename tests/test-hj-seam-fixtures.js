@@ -178,3 +178,27 @@ test('fixture: lemmatization-edge pins behavior (either pass or fail, as long as
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('fixture: cross-language-smuggle — CJK orphans caught by Layer 2b', () => {
+  const dir = makeTmpDir();
+  try {
+    installProvenanceFixture(dir, 'cross-language-smuggle');
+    const result = runHandoffValidate(dir);
+    assert.notEqual(result.code, 0);
+    const out = result.stdout + result.stderr;
+    assert.match(out, /orphan|开始|训练/);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: cross-language-approved — explicit CJK condition passes', () => {
+  const dir = makeTmpDir();
+  try {
+    installProvenanceFixture(dir, 'cross-language-approved');
+    const result = runHandoffValidate(dir);
+    assert.equal(result.code, 0, `stderr: ${result.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
