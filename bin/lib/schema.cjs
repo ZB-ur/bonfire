@@ -87,11 +87,11 @@ function validateProvenance(compileOutput, context) {
       const entries = Array.isArray(target) ? target : Object.entries(target).map(([k, v]) => v);
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context);
+        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context, slotConfig);
         errors.push(...entryErrors);
       }
     } else if (slotConfig.kind === 'whole_section') {
-      const sectionErrors = checkEntryProvenance(target, slotPath, context);
+      const sectionErrors = checkEntryProvenance(target, slotPath, context, slotConfig);
       errors.push(...sectionErrors);
     }
   }
@@ -109,7 +109,7 @@ function resolveSlotPath(root, dottedPath) {
   return current;
 }
 
-function checkEntryProvenance(entry, pathLabel, context) {
+function checkEntryProvenance(entry, pathLabel, context, slotConfig) {
   const errors = [];
   if (!entry || typeof entry !== 'object') {
     errors.push(`${pathLabel}: not an object (can't validate provenance)`);
@@ -129,6 +129,8 @@ function checkEntryProvenance(entry, pathLabel, context) {
     errors.push(`${pathLabel}: source_kind "${kind}" not one of ledger_direct|condition_rewrite`);
     return errors;
   }
+
+  let sourceText = '';
   if (kind === 'ledger_direct') {
     const snap = context.snapshot || { entries: {} };
     const ledgerEntry = (snap.entries || {})[ref];
@@ -138,7 +140,9 @@ function checkEntryProvenance(entry, pathLabel, context) {
     }
     if (ledgerEntry.status !== 'FROZEN') {
       errors.push(`${pathLabel}: source_ref "${ref}" is ${ledgerEntry.status}, expected FROZEN`);
+      return errors;
     }
+    sourceText = ledgerEntry.content || '';
   } else if (kind === 'condition_rewrite') {
     const verdict = context.verdict;
     const idx = ref && ref.condition_index;
@@ -154,9 +158,55 @@ function checkEntryProvenance(entry, pathLabel, context) {
     const cond = conds[idx];
     if (!cond || cond.target_stage !== 'stage-j') {
       errors.push(`${pathLabel}: referenced condition must have target_stage "stage-j"`);
+      return errors;
+    }
+    sourceText = cond.text || '';
+  }
+
+  // Layer 2b: token coverage — after Layer 2a resolves the source, extract
+  // substantive tokens from the slot content and compare against source text.
+  const { compareTokens } = require('./seam-validation.cjs');
+  const slotTokens = extractEntryTokens(entry, slotConfig);
+  const orphans = compareTokens(slotTokens, sourceText);
+  if (orphans.length > 0) {
+    const preview = orphans.slice(0, 10).join(', ');
+    const more = orphans.length > 10 ? ` (+${orphans.length - 10} more)` : '';
+    errors.push(`${pathLabel}: orphan tokens not in source (${kind}=${JSON.stringify(ref)}): ${preview}${more}`);
+  }
+
+  return errors;
+}
+
+// Extract substantive tokens from an entry's string leaves for Layer 2b
+// comparison. Honors `slotConfig.fields` at the top level — when present,
+// only the listed top-level keys are walked. Always skips `source_kind`
+// and `source_ref` (provenance metadata, never substantive content).
+function extractEntryTokens(entry, slotConfig) {
+  const { extractSubstantiveTokens } = require('./seam-validation.cjs');
+  const tokens = [];
+  const fields = (slotConfig && Array.isArray(slotConfig.fields)) ? slotConfig.fields : null;
+
+  function walk(value, path) {
+    if (value == null) return;
+    if (typeof value === 'string') {
+      for (const t of extractSubstantiveTokens(value)) tokens.push(t);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const v of value) walk(v, path);
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const [k, v] of Object.entries(value)) {
+        if (k === 'source_kind' || k === 'source_ref') continue;
+        if (fields !== null && path.length === 0 && !fields.includes(k)) continue;
+        walk(v, path.concat(k));
+      }
     }
   }
-  return errors;
+
+  walk(entry, []);
+  return tokens;
 }
 
 function validateBundle(root) {
