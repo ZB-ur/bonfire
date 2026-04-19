@@ -1,0 +1,7 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "x",
+  "conditions": [
+    { "text": "repropose CON-014 with exact count", "target_stage": "stage-c" }
+  ]
+}
