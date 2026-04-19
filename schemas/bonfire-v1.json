@@ -169,7 +169,9 @@
     "probe_invalidated":      { "to": "stage-f", "crosses_pipeline": false },
     "adversarial_unresolved": { "to": "stage-g", "crosses_pipeline": false },
     "handoff_incomplete":     { "to": "stage-h", "crosses_pipeline": false },
-    "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false }
+    "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false },
+    "invalid_stage_j_condition":   { "to": "stage-h", "crosses_pipeline": false },
+    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false }
   },
   "categories": {
     "retained_goal": {
@@ -236,7 +238,12 @@
       "optional_fields": ["conflict_type", "conditions", "rulings"],
       "constraints": {
         "verdict_enum": ["approved", "approved_with_conditions", "rejected"],
-        "conflict_type_required_when_rejected": true
+        "conflict_type_required_when_rejected": true,
+        "condition_item_shape": {
+          "type": "object",
+          "required_fields": ["text", "target_stage"],
+          "target_stage_enum": ["stage-j"]
+        }
       }
     },
     "bonfire-evaluator": {
