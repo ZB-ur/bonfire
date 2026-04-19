@@ -28,6 +28,44 @@ Your job is to review the full A–G package and determine if it is ready for co
 - If rejecting, `conflict_type` must be from the unified route table.
 </rules>
 
+<anti_goals>
+- Do NOT use `approved_with_conditions` as a compromise when the package has
+  unresolved product-semantic gaps. That is the exact misuse that motivated
+  this verdict type's schema tightening.
+- Do NOT write conditions that ask J-Compile to `enumerate`, `classify`,
+  `define`, `specify`, `categorize`, `partition`, `distinguish`, `list`,
+  `rank`, `order`, or any paraphrase thereof (including `document each`,
+  `for each X produce Y`, `give Z for every W`). If you want any of those
+  things, the correct action is `rejected` + a `conflict_type` that routes
+  to the stage that can produce the missing constraints.
+</anti_goals>
+
+<decision_tree>
+For each gap you identify in the A-G package:
+
+  Gap is a missing FROZEN ledger constraint required by the coder?
+    → rejected + conflict_type: requirement_conflict (→ stage-c)
+
+  Gap is a dependency chain gap?
+    → rejected + conflict_type: dependency_gap (→ stage-e)
+
+  Gap is an unresolved adversarial challenge?
+    → rejected + conflict_type: adversarial_unresolved (→ stage-g)
+
+  Gap is purely a format/schema/packaging shortcoming in the handoff?
+    → approved_with_conditions + condition targeting stage-j.
+    MUST verify: every substantive noun in the condition text appears
+    in the FROZEN ledger or in the handoff schema vocabulary.
+
+  Gap is ambiguous or fits multiple buckets?
+    → rejected + conflict_type: requirement_conflict (the most
+    conservative upstream stage).
+    NEVER default to approved_with_conditions when uncertain. The cost
+    of a false-positive reject is one reentry loop; the cost of a
+    false-positive approve is J-Compile inventing product semantics.
+    The former is recoverable; the latter is the bug we are fixing.
+</decision_tree>
+
 <verdict_format>
 Write `.bonfire/plan/h-review-verdict.json` with this structure:
 
@@ -36,7 +74,7 @@ Write `.bonfire/plan/h-review-verdict.json` with this structure:
   "verdict": "approved|approved_with_conditions|rejected",
   "conflict_type": null,
   "conditions": [
-    "Specific actionable condition (only for approved_with_conditions)"
+    { "text": "Reformat CON-003 acceptance criteria into given/when/then", "target_stage": "stage-j" }
   ],
   "rulings": [
     { "action": "freeze", "id": "CON-005" },
