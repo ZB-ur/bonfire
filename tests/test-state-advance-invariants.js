@@ -260,7 +260,7 @@ test('regression: gto-trainer fixture — after stage-g-freeze-gate, stage-g adv
   }
 });
 
-test('regression: gto-trainer fixture — after stage-g freezes, stage-h advance blocks until rulings applied', () => {
+test('regression: gto-trainer fixture — stage-h advance passes trivially when rulings are redundant with stage-g freezes', () => {
   const dir = loadFixture();
   try {
     execFileSync('node', [CLI, 'stage-g-freeze-gate'], { encoding: 'utf8', cwd: dir });
@@ -272,8 +272,12 @@ test('regression: gto-trainer fixture — after stage-g freezes, stage-h advance
     state.steps['stage-h'] = { status: 'running', pipeline: 'plan', started_at: new Date().toISOString() };
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 
-    // Stage G already froze all 5 — verdict rulings are redundant. State-comparison
-    // should treat them as trivially satisfied (targets already FROZEN).
+    // Under the new pipeline, stage-g-freeze-gate already froze every entry that the
+    // verdict's rulings target. State-comparison invariant (§5.2) sees each ruling
+    // trivially satisfied (target status === FROZEN) and allows the advance without
+    // requiring apply-h-rulings to run. The classical "stage-h blocks on unsatisfied
+    // rulings → apply-h-rulings → succeeds" flow is covered by non-fixture tests
+    // earlier in this file; here we prove the redundant-ruling case.
     const result = runAdvance(dir, 'stage-h');
     assert.equal(result.code, 0);
   } finally {
