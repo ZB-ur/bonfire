@@ -110,6 +110,7 @@ function checkStageGInvariant() {
 function checkStageHInvariant() {
   const { loadSnapshot } = require('./truth-surface.cjs');
   const { validateDelta } = require('./delta-parser.cjs');
+  const { validateHConditions } = require('./seam-validation.cjs');
   const root = getRoot();
   const dir = path.dirname(root);
   const verdictPath = path.join(root, 'plan', 'h-review-verdict.json');
@@ -133,12 +134,30 @@ function checkStageHInvariant() {
     );
   }
 
+  // Load snapshot once — reused by Layer 1 below and the rulings check.
+  const snapshot = loadSnapshot(dir);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  // Layer 1: condition-text invariants (blacklisted verbs, paraphrase patterns,
+  // orphan tokens). Runs after schema validation, before rulings invariant.
+  const condResult = validateHConditions(verdict, snapshot);
+  if (!condResult.valid) {
+    process.stderr.write(
+      `Cannot advance from stage-h: ${condResult.violations.length} condition violation(s):\n`
+    );
+    for (const v of condResult.violations) {
+      const idx = v.index === null ? 'verdict' : `conditions[${v.index}]`;
+      process.stderr.write(`  - ${idx}: ${v.reason}\n`);
+    }
+    process.stderr.write(
+      `Run: bonfire state-reentry --conflict-type invalid_stage_j_condition\n`
+    );
+    process.exit(1);
+  }
+
   const rulings = Array.isArray(verdict.rulings) ? verdict.rulings : [];
   const filtered = rulings.filter(r => r.action === 'freeze' || r.action === 'supersede');
   if (filtered.length === 0) return;  // trivial pass
-
-  const snapshot = loadSnapshot(dir);
-  const entries = (snapshot && snapshot.entries) || {};
 
   const failures = [];
   for (const ruling of filtered) {

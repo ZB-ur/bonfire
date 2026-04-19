@@ -116,8 +116,11 @@ function setPipelineToStageH(dir) {
 function writeVerdict(dir, rulings) {
   const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
   fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+  // Use `approved` rather than `approved_with_conditions` — these tests exercise
+  // the rulings invariant without needing stage-j conditions, so Layer 1 is a
+  // no-op. (approved_with_conditions + no conditions would now fail Layer 1.)
   fs.writeFileSync(verdictPath, JSON.stringify({
-    verdict: 'approved_with_conditions',
+    verdict: 'approved',
     reason: 'test',
     rulings,
   }, null, 2));
@@ -340,6 +343,76 @@ test('state-advance from stage-g allows when only can_freeze=false categories ar
 
     const result = runAdvance(dir, 'stage-g');
     assert.equal(result.code, 0, 'challenged_claim should not block stage-g advance');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Layer 1 integration — validate-h-conditions gates stage-h advance
+// ---------------------------------------------------------------------------
+
+test('state-advance from stage-h fails when verdict has a blacklisted verb in a condition', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-001', '--category', 'retained_goal',
+      '--content', 'some content', '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-update',
+      '--id', 'CON-001', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-001'],
+      { encoding: 'utf8', cwd: dir });
+
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({
+      verdict: 'approved_with_conditions',
+      reason: 'test',
+      rulings: [],
+      conditions: [
+        { text: 'J-Compile MUST enumerate CON-001 subcategories', target_stage: 'stage-j' }
+      ],
+    }, null, 2));
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.notEqual(result.code, 0);
+    const out = result.stdout + result.stderr;
+    assert.match(out, /enumerate|invalid_stage_j_condition/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('state-advance from stage-h passes when stage-j conditions are clean', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-002', '--category', 'retained_goal',
+      '--content', 'drill mode', '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-update',
+      '--id', 'CON-002', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-002'],
+      { encoding: 'utf8', cwd: dir });
+
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({
+      verdict: 'approved_with_conditions',
+      reason: 'minor format',
+      rulings: [],
+      conditions: [
+        { text: 'reformat CON-002 drill mode into given when then', target_stage: 'stage-j' }
+      ],
+    }, null, 2));
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.equal(result.code, 0, `stderr: ${result.stderr}`);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
