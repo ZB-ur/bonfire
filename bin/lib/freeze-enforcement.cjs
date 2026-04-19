@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { loadSnapshot, update, freeze } = require('./truth-surface.cjs');
+const { loadSnapshot, update, freeze, checkMaturityGate } = require('./truth-surface.cjs');
 
 // Authorizer tokens written to aligned_by before an auto-freeze.
 const TOKEN_STAGE_G = 'stage-g-survival';
@@ -125,10 +125,24 @@ function applyHRulings(root) {
       }
       // Plan auto-alignment if challenged_by empty; freeze either way.
       const challengedByEmpty = !Array.isArray(entry.challenged_by) || entry.challenged_by.length === 0;
-      toExecute.push({
-        ruling,
-        plan: challengedByEmpty ? 'freeze-with-align' : 'freeze',
-      });
+      const plan = challengedByEmpty ? 'freeze-with-align' : 'freeze';
+
+      // Project the post-alignment state and verify it would satisfy the
+      // maturity gate. Without this, a can_freeze:false category (risk,
+      // discarded_option, challenged_claim) would pass pre-validation, then
+      // throw during execute AFTER the aligned_by update has already been
+      // appended — a partial write. See spec §5.1 step 4.
+      const projected = (plan === 'freeze-with-align')
+        ? { ...entry, aligned_by: [...(entry.aligned_by || []), TOKEN_STAGE_H] }
+        : entry;
+      try {
+        checkMaturityGate(projected);
+      } catch (err) {
+        failures.push({ ruling, reason: err.message });
+        continue;
+      }
+
+      toExecute.push({ ruling, plan });
       continue;
     }
 

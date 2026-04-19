@@ -202,3 +202,29 @@ test('apply-h-rulings accepts a verdict with no rulings field', () => {
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('apply-h-rulings fails pre-validation for can_freeze=false categories without partial writes', () => {
+  const dir = makeTmpDir();
+  try {
+    // high_impact_risk has can_freeze: false in the schema
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'RISK-NO-FREEZE', '--category', 'high_impact_risk',
+      '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
+      { encoding: 'utf8', cwd: dir });
+
+    const historyBefore = readHistory(dir).length;
+
+    writeVerdict(dir, [{ action: 'freeze', id: 'RISK-NO-FREEZE' }]);
+    const result = runApply(dir);
+    assert.notEqual(result.code, 0, 'should fail pre-validation');
+
+    const historyAfter = readHistory(dir).length;
+    assert.equal(historyAfter, historyBefore, 'no events should have been appended (including no stray aligned_by update)');
+
+    const snap = readSnapshot(dir);
+    assert.equal(snap.entries['RISK-NO-FREEZE'].status, 'OPEN', 'risk entry unchanged');
+    assert.deepEqual(snap.entries['RISK-NO-FREEZE'].aligned_by, [], 'no auto-alignment leaked through');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});

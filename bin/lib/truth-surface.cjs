@@ -494,4 +494,5 @@ module.exports = {
   rebuild,
   getHistoryPath,
   getSnapshotPath,
+  checkMaturityGate,  // exported so freeze-enforcement can pre-validate
 };
