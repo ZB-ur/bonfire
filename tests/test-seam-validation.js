@@ -138,3 +138,119 @@ test('VERB_BLACKLIST is a Set containing the expected verbs', () => {
     assert.ok(VERB_BLACKLIST.has(verb), `expected ${verb} in blacklist`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// validateHConditions
+// ---------------------------------------------------------------------------
+
+const { validateHConditions } = require('../bin/lib/seam-validation.cjs');
+
+function mkSnapshot(ledgerEntries = {}) {
+  return { entries: ledgerEntries };
+}
+
+test('validateHConditions: verdict not approved_with_conditions returns {valid: true, violations: []}', () => {
+  const result = validateHConditions({ verdict: 'approved', reason: 'x' }, mkSnapshot());
+  assert.deepEqual(result, { valid: true, violations: [] });
+});
+
+test('validateHConditions: empty conditions array returns violation (approved_with_conditions requires conditions)', () => {
+  const result = validateHConditions(
+    { verdict: 'approved_with_conditions', reason: 'x', conditions: [] },
+    mkSnapshot()
+  );
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /empty/i.test(v.reason)));
+});
+
+test('validateHConditions: condition with all tokens in FROZEN ledger passes', () => {
+  const snapshot = mkSnapshot({
+    'CON-003': { status: 'FROZEN', content: 'user can select drill mode', category: 'retained_goal' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'CON-003 drill mode MUST be rendered in Given/When/Then format', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, true, `violations: ${JSON.stringify(result.violations)}`);
+});
+
+test('validateHConditions: condition with verb blacklist word fails', () => {
+  const snapshot = mkSnapshot({
+    'CON-014': { status: 'FROZEN', content: 'board texture classification', category: 'frozen_constraint' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'J-Compile MUST enumerate CON-014 categories', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /enumerate/.test(v.reason)));
+});
+
+test('validateHConditions: paraphrase pattern "document each" fails even with no blacklisted verb', () => {
+  const snapshot = mkSnapshot({
+    'CON-014': { status: 'FROZEN', content: 'board texture', category: 'frozen_constraint' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'handoff MUST document each board texture', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /paraphrase|document each/i.test(v.reason)));
+});
+
+test('validateHConditions: paraphrase pattern "for each X produce Y" fails', () => {
+  const snapshot = mkSnapshot({
+    'CON-020': { status: 'FROZEN', content: 'hand strength categories', category: 'frozen_constraint' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'for each hand strength produce a row', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /paraphrase|for each/i.test(v.reason)));
+});
+
+test('validateHConditions: condition with orphan substantive token fails', () => {
+  const snapshot = mkSnapshot({
+    'CON-001': { status: 'FROZEN', content: 'GTO strategy trainer', category: 'retained_goal' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'CON-001 MUST expose a monte-carlo simulator', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /monte-carlo|simulator/i.test(v.reason)));
+});
+
+test('validateHConditions: condition referencing PROPOSED (not FROZEN) ledger entry fails', () => {
+  const snapshot = mkSnapshot({
+    'CON-999': { status: 'PROPOSED', content: 'some text', category: 'retained_goal' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'CON-999 MUST be reformatted', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+});
+
+test('validateHConditions: reports violation index matching condition index', () => {
+  const snapshot = mkSnapshot({
+    'CON-001': { status: 'FROZEN', content: 'text', category: 'retained_goal' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [
+      { text: 'CON-001 reformat given when then', target_stage: 'stage-j' },
+      { text: 'J-Compile MUST enumerate new fields', target_stage: 'stage-j' },
+    ],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => v.index === 1));
+});

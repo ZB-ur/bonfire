@@ -11,7 +11,10 @@
 ## Structure words
 
 # Given/When/Then format
-given when then
+given when then given/when/then
+
+# Format/render verbs (stage-j structure words)
+format formatted formats rendered render renders reformat reformatted
 
 # Modal verbs
 must should may shall can could would

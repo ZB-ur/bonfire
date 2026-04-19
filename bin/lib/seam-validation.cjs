@@ -123,11 +123,110 @@ const VERB_BLACKLIST = new Set([
 
 const PARAPHRASE_PATTERNS = [
   /\bdocument each\b/i,
-  /\bfor each\s+\w+\s+(produce|provide|give|return|emit|write|output)\b/i,
+  /\bfor each\s+(?:\w+\s+){1,5}(produce|provide|give|return|emit|write|output)\b/i,
   /\bgive\s+\w+\s+for every\b/i,
   /\bwrite out every\b/i,
   /\bone per\s+\w+\b/i,  // e.g. "one per category" — enumeration by another name
 ];
+
+// ---------------------------------------------------------------------------
+// validateHConditions — Layer 1 entry check
+// ---------------------------------------------------------------------------
+
+function buildFrozenTokenVocabulary(snapshot) {
+  // Aggregate all substantive tokens from FROZEN ledger entries + the ledger id set.
+  const tokens = new Set();
+  const frozenIds = new Set();
+  const entries = (snapshot && snapshot.entries) || {};
+  for (const [id, entry] of Object.entries(entries)) {
+    if (entry && entry.status === 'FROZEN') {
+      frozenIds.add(id.toLowerCase());
+      const contentTokens = extractSubstantiveTokens(entry.content || '');
+      for (const t of contentTokens) {
+        // Record both the raw token (for CJK literal match) and the lemma.
+        tokens.add(t);
+        tokens.add(lemmatizeToken(t));
+      }
+    }
+  }
+  return { tokens, frozenIds };
+}
+
+function validateHConditions(verdict, snapshot) {
+  const violations = [];
+
+  if (!verdict || verdict.verdict !== 'approved_with_conditions') {
+    return { valid: true, violations };
+  }
+
+  const conditions = Array.isArray(verdict.conditions) ? verdict.conditions : [];
+
+  if (conditions.length === 0) {
+    violations.push({
+      index: null,
+      reason: 'verdict is approved_with_conditions but conditions array is empty — use verdict: "approved" instead',
+    });
+    return { valid: false, violations };
+  }
+
+  const whitelist = loadFormatWhitelist();
+  const { tokens: frozenTokens, frozenIds } = buildFrozenTokenVocabulary(snapshot);
+
+  for (let i = 0; i < conditions.length; i++) {
+    const cond = conditions[i];
+    const text = cond && cond.text ? String(cond.text) : '';
+    const condTokens = extractSubstantiveTokens(text);
+
+    // Rule 1.5: paraphrase patterns — multi-word regexes that catch dodges
+    // of the single-word verb blacklist. Scanned BEFORE verb blacklist so
+    // that paraphrase-caught conditions get the specific paraphrase reason.
+    let paraphraseHit = false;
+    for (const pat of PARAPHRASE_PATTERNS) {
+      if (pat.test(text)) {
+        violations.push({
+          index: i,
+          reason: `condition text matches blacklisted paraphrase pattern "${pat.source}" — use rejected + appropriate conflict_type instead`,
+        });
+        paraphraseHit = true;
+        break;
+      }
+    }
+    if (paraphraseHit) continue;  // skip further rules for this condition; one violation per condition is enough
+
+    // Rule 2: verb blacklist
+    let verbHit = false;
+    for (const token of condTokens) {
+      if (VERB_BLACKLIST.has(token)) {
+        violations.push({
+          index: i,
+          reason: `condition text contains blacklisted verb "${token}" — use rejected + appropriate conflict_type instead`,
+        });
+        verbHit = true;
+        break;  // one violation per condition is enough
+      }
+    }
+    if (verbHit) continue;
+
+    // Rule 1: token coverage
+    for (const rawToken of condTokens) {
+      const token = lemmatizeToken(rawToken);
+      if (whitelist.has(token)) continue;
+      if (whitelist.has(rawToken)) continue;
+      if (frozenTokens.has(token)) continue;
+      if (frozenTokens.has(rawToken)) continue;
+      if (frozenIds.has(rawToken) || frozenIds.has(token)) continue;
+      // CJK tokens must be exact-match in frozenTokens (no lemmatization)
+      if (isCJKToken(rawToken) && frozenTokens.has(rawToken)) continue;
+      violations.push({
+        index: i,
+        reason: `orphan substantive token "${rawToken}" not in FROZEN ledger or format whitelist`,
+      });
+      // Don't break — we want to report all orphan tokens per condition
+    }
+  }
+
+  return { valid: violations.length === 0, violations };
+}
 
 // ---------------------------------------------------------------------------
 // Exports
@@ -140,4 +239,5 @@ module.exports = {
   isCJKToken,
   VERB_BLACKLIST,
   PARAPHRASE_PATTERNS,
+  validateHConditions,
 };
