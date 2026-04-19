@@ -27,6 +27,8 @@ const COMMANDS = {
   'truth-read':       () => truthCommand('read'),
   'truth-query':      () => truthCommand('query'),
   'truth-rebuild':    () => truthCommand('rebuild'),
+  'stage-g-freeze-gate': () => stageGFreezeGateCommand,
+  'apply-h-rulings':     () => applyHRulingsCommand,
   'delta-validate':   () => deltaValidateCommand,
   'handoff-validate': () => handoffValidateCommand,
   'bundle-validate':  () => bundleValidateCommand,
@@ -216,6 +218,40 @@ function routeCommand(args) {
     exitError(`Unknown conflict type: ${type}`, Object.keys(schema.reentry_routes));
   }
   exitJSON(route);
+}
+
+function stageGFreezeGateCommand(args) {
+  const { stageGFreezeGate } = require('./lib/freeze-enforcement.cjs');
+  const { resolveRoot, exitJSON, exitError } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+
+  try {
+    const summary = stageGFreezeGate(dir);
+    if (summary.unresolved.length > 0) {
+      process.stderr.write(
+        `stage-g-freeze-gate: ${summary.unresolved.length} unresolved CHALLENGED entries ` +
+        `without alignment:\n`
+      );
+      for (const id of summary.unresolved) {
+        process.stderr.write(`  - ${id}\n`);
+      }
+      process.stderr.write(
+        `Return these to G-Blue for defense or escalate to H-Review.\n`
+      );
+      exitJSON(summary, 1);
+    }
+    exitJSON(summary, 0);
+  } catch (err) {
+    exitError(err.message, []);
+  }
+}
+
+function applyHRulingsCommand(args) {
+  // Implementation added in Task 3.
+  const { exitError } = require('./lib/utils.cjs');
+  exitError('apply-h-rulings not yet implemented', []);
 }
 
 function main() {
