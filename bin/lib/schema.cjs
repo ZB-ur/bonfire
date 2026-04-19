@@ -9,7 +9,7 @@ const HANDOFF_REQUIRED_FIELDS = [
   'implementation_units'
 ];
 
-function validateHandoff(compileOutput) {
+function validateHandoff(compileOutput, context) {
   const errors = [];
   if (!compileOutput || !compileOutput.handoff) {
     return { valid: false, errors: ['compile-output.json missing handoff section'] };
@@ -29,7 +29,104 @@ function validateHandoff(compileOutput) {
   if (Array.isArray(handoff.implementation_units) && handoff.implementation_units.length === 0) {
     errors.push('handoff.implementation_units is empty');
   }
+
+  // Layer 2a: provenance enforcement
+  const provenanceErrors = validateProvenance(compileOutput, context || {});
+  errors.push(...provenanceErrors);
+
   return { valid: errors.length === 0, errors };
+}
+
+function validateProvenance(compileOutput, context) {
+  const errors = [];
+  const schema = loadSchema();
+  const slots = (schema && schema.handoff_substantive_slots) || {};
+
+  for (const [slotPath, slotConfig] of Object.entries(slots)) {
+    if (!slotConfig || !slotConfig._provenance_required) continue;
+    const target = resolveSlotPath(compileOutput, slotPath);
+    if (target === undefined) continue;  // slot absent → conditional-triggered exemption
+
+    if (slotConfig.kind === 'per_entry') {
+      // target must be an object whose values are entries
+      if (typeof target !== 'object' || target === null) {
+        errors.push(`${slotPath}: expected object for per_entry slot`);
+        continue;
+      }
+      // If it's an array, iterate elements; if it's a plain object, iterate values.
+      const entries = Array.isArray(target) ? target : Object.entries(target).map(([k, v]) => v);
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context);
+        errors.push(...entryErrors);
+      }
+    } else if (slotConfig.kind === 'whole_section') {
+      const sectionErrors = checkEntryProvenance(target, slotPath, context);
+      errors.push(...sectionErrors);
+    }
+  }
+
+  return errors;
+}
+
+function resolveSlotPath(root, dottedPath) {
+  const parts = dottedPath.split('.');
+  let current = root;
+  for (const p of parts) {
+    if (current == null) return undefined;
+    current = current[p];
+  }
+  return current;
+}
+
+function checkEntryProvenance(entry, pathLabel, context) {
+  const errors = [];
+  if (!entry || typeof entry !== 'object') {
+    errors.push(`${pathLabel}: not an object (can't validate provenance)`);
+    return errors;
+  }
+  const kind = entry.source_kind;
+  const ref = entry.source_ref;
+  if (kind === undefined) {
+    errors.push(`${pathLabel}: missing source_kind`);
+    return errors;
+  }
+  if (ref === undefined) {
+    errors.push(`${pathLabel}: missing source_ref`);
+    return errors;
+  }
+  if (kind !== 'ledger_direct' && kind !== 'condition_rewrite') {
+    errors.push(`${pathLabel}: source_kind "${kind}" not one of ledger_direct|condition_rewrite`);
+    return errors;
+  }
+  if (kind === 'ledger_direct') {
+    const snap = context.snapshot || { entries: {} };
+    const ledgerEntry = (snap.entries || {})[ref];
+    if (!ledgerEntry) {
+      errors.push(`${pathLabel}: source_ref "${ref}" not found in ledger`);
+      return errors;
+    }
+    if (ledgerEntry.status !== 'FROZEN') {
+      errors.push(`${pathLabel}: source_ref "${ref}" is ${ledgerEntry.status}, expected FROZEN`);
+    }
+  } else if (kind === 'condition_rewrite') {
+    const verdict = context.verdict;
+    const idx = ref && ref.condition_index;
+    if (!verdict || typeof idx !== 'number') {
+      errors.push(`${pathLabel}: condition_rewrite source_ref must be { condition_index: <number> } with a verdict in context`);
+      return errors;
+    }
+    const conds = Array.isArray(verdict.conditions) ? verdict.conditions : [];
+    if (idx < 0 || idx >= conds.length) {
+      errors.push(`${pathLabel}: source_ref.condition_index ${idx} out of range (verdict has ${conds.length} conditions)`);
+      return errors;
+    }
+    const cond = conds[idx];
+    if (!cond || cond.target_stage !== 'stage-j') {
+      errors.push(`${pathLabel}: referenced condition must have target_stage "stage-j"`);
+    }
+  }
+  return errors;
 }
 
 function validateBundle(root) {
