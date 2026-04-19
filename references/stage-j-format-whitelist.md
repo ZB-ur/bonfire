@@ -14,7 +14,10 @@
 given when then given/when/then
 
 # Format/render verbs (stage-j structure words)
-format formatted formats rendered render renders reformat reformatted
+format formatted formats rendered render renders reformat reformatted rewrite rewritten rewrites rewriting
+
+# Stage-j structure nouns
+acceptance criteria criterion scenario scenarios
 
 # Modal verbs
 must should may shall can could would

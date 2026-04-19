@@ -417,3 +417,81 @@ test('state-advance from stage-h passes when stage-j conditions are clean', () =
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// End-to-end flow: clean H→J path
+// ---------------------------------------------------------------------------
+
+test('E2E: clean H→J flow — valid stage-j condition, provenance handoff, all validators pass', () => {
+  const dir = makeTmpDir();
+  try {
+    // 1. Propose + freeze a ledger entry. Content includes every substantive
+    //    token that will appear downstream in the stage-j condition text and
+    //    in the ui_contract slot description, so Layer 1 (condition token
+    //    coverage) and Layer 2b (slot→condition token overlap) both pass.
+    execFileSync('node', [CLI, 'truth-propose',
+      '--id', 'CON-100', '--category', 'retained_goal',
+      '--content', 'user placed bet when showdown occurs user sees winning hand at showdown',
+      '--rationale', 'r', '--source', 'stage-c'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-update',
+      '--id', 'CON-100', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      { encoding: 'utf8', cwd: dir });
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-100'],
+      { encoding: 'utf8', cwd: dir });
+
+    // 2. Write an H-Review verdict with a clean stage-j condition
+    setPipelineToStageH(dir);
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({
+      verdict: 'approved_with_conditions',
+      reason: 'format rewrite',
+      rulings: [],
+      conditions: [
+        {
+          text: 'rewrite CON-100 acceptance into given when then: given user placed bet when showdown occurs then user sees winning hand',
+          target_stage: 'stage-j',
+        },
+      ],
+    }, null, 2));
+
+    // 3. Write a compile-output with proper provenance
+    const compilePath = path.join(dir, '.bonfire', 'plan', 'compile-output.json');
+    fs.writeFileSync(compilePath, JSON.stringify({
+      handoff: {
+        code_ready: true,
+        handoff_summary: 'showdown scenario',
+        retained_goal: 'user sees winning hand',
+        implementation_scope: 'single panel',
+        implementation_units: [{ id: 'unit-1' }],
+        ui_contract: {
+          panels: {
+            Showdown: {
+              description: 'Given user placed bet When showdown occurs Then user sees winning hand',
+              source_kind: 'condition_rewrite',
+              source_ref: { condition_index: 0 },
+            },
+          },
+        },
+      },
+    }, null, 2));
+
+    // 4. state-advance from stage-h — Layer 1 should pass
+    const advanceResult = runAdvance(dir, 'stage-h');
+    assert.equal(advanceResult.code, 0, `stage-h advance failed: ${advanceResult.stderr}`);
+
+    // 5. handoff-validate — Layer 2a + 2b should pass
+    const validateResult = (() => {
+      try {
+        const stdout = execFileSync('node', [CLI, 'handoff-validate'], { encoding: 'utf8', cwd: dir });
+        return { code: 0, stdout };
+      } catch (err) {
+        return { code: err.status, stderr: err.stderr ? err.stderr.toString() : '' };
+      }
+    })();
+    assert.equal(validateResult.code, 0, `handoff-validate failed: ${validateResult.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
