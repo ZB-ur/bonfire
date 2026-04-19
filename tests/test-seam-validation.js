@@ -254,3 +254,49 @@ test('validateHConditions: reports violation index matching condition index', ()
   assert.equal(result.valid, false);
   assert.ok(result.violations.some(v => v.index === 1));
 });
+
+// ---------------------------------------------------------------------------
+// compareTokens
+// ---------------------------------------------------------------------------
+
+const { compareTokens } = require('../bin/lib/seam-validation.cjs');
+
+test('compareTokens: all tokens in source → no orphans', () => {
+  const orphans = compareTokens(['board', 'texture'], 'board texture classification');
+  assert.deepEqual(orphans, []);
+});
+
+test('compareTokens: slot tokens absent from source → reported as orphans', () => {
+  const orphans = compareTokens(['monte-carlo', 'texture'], 'board texture classification');
+  assert.ok(orphans.includes('monte-carlo'));
+  assert.ok(!orphans.includes('texture'));
+});
+
+test('compareTokens: format whitelist tokens always pass', () => {
+  const orphans = compareTokens(['given', 'when', 'then', 'card'], 'card model');
+  assert.deepEqual(orphans, []);
+});
+
+test('compareTokens: lemmatization matches cards ↔ card', () => {
+  const orphans = compareTokens(['cards'], 'the card model');
+  assert.deepEqual(orphans, []);
+});
+
+test('compareTokens: CJK tokens require exact literal match (no lemma)', () => {
+  const orphans1 = compareTokens(['开'], '开 始');
+  assert.deepEqual(orphans1, []);
+
+  const orphans2 = compareTokens(['开'], '始');
+  assert.ok(orphans2.includes('开'));
+});
+
+test('compareTokens: numbers are substantive', () => {
+  const orphans = compareTokens(['10', '5'], 'there are several categories');
+  assert.ok(orphans.includes('10'));
+  assert.ok(orphans.includes('5'));
+});
+
+test('compareTokens: empty slot tokens → no orphans', () => {
+  const orphans = compareTokens([], 'anything');
+  assert.deepEqual(orphans, []);
+});

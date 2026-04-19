@@ -229,6 +229,37 @@ function validateHConditions(verdict, snapshot) {
 }
 
 // ---------------------------------------------------------------------------
+// compareTokens — Layer 2b core (per-slot token overlap)
+// ---------------------------------------------------------------------------
+
+function compareTokens(slotTokens, sourceText) {
+  const whitelist = loadFormatWhitelist();
+  const sourceTokens = extractSubstantiveTokens(sourceText || '');
+  const sourceSet = new Set();
+  for (const t of sourceTokens) {
+    sourceSet.add(lemmatizeToken(t));
+    sourceSet.add(t);  // also keep raw for CJK exact-match
+  }
+
+  const orphans = [];
+  for (const raw of slotTokens) {
+    if (raw === undefined || raw === null || raw === '') continue;
+    if (whitelist.has(raw)) continue;
+    const lemma = lemmatizeToken(raw);
+    if (whitelist.has(lemma)) continue;
+    if (isCJKToken(raw)) {
+      // CJK: literal match only, no lemmatization
+      if (sourceSet.has(raw)) continue;
+      orphans.push(raw);
+      continue;
+    }
+    if (sourceSet.has(lemma) || sourceSet.has(raw)) continue;
+    orphans.push(raw);
+  }
+  return orphans;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -240,4 +271,5 @@ module.exports = {
   VERB_BLACKLIST,
   PARAPHRASE_PATTERNS,
   validateHConditions,
+  compareTokens,
 };
