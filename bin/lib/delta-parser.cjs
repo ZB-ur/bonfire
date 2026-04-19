@@ -48,6 +48,34 @@ function validateDelta(agentName, delta) {
     }
   }
 
+  if (constraints.condition_item_shape && delta.conditions !== undefined) {
+    const shape = constraints.condition_item_shape;
+    if (!Array.isArray(delta.conditions)) {
+      errors.push('conditions must be an array when present');
+    } else {
+      for (let i = 0; i < delta.conditions.length; i++) {
+        const item = delta.conditions[i];
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+          errors.push(`conditions[${i}] must be an object`);
+          continue;
+        }
+        for (const required of (shape.required_fields || [])) {
+          if (item[required] === undefined || item[required] === null) {
+            errors.push(`conditions[${i}] missing required field: ${required}`);
+          }
+        }
+        if (shape.target_stage_enum && item.target_stage !== undefined) {
+          if (!shape.target_stage_enum.includes(item.target_stage)) {
+            errors.push(
+              `conditions[${i}].target_stage "${item.target_stage}" ` +
+              `not in [${shape.target_stage_enum.join(', ')}]`
+            );
+          }
+        }
+      }
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 

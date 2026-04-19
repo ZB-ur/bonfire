@@ -48,3 +48,68 @@ test('evaluator: FAIL with invalid conflict_type rejects', () => {
 test('unknown agent rejects', () => {
   assert.equal(validateDelta('bonfire-unknown', {}).valid, false);
 });
+
+// ---------------------------------------------------------------------------
+// condition_item_shape (bonfire-h-review)
+// ---------------------------------------------------------------------------
+
+test('bonfire-h-review: valid condition item passes', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = {
+    verdict: 'approved_with_conditions',
+    reason: 'ok',
+    conditions: [{ text: 'rewrite to given/when/then', target_stage: 'stage-j' }],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, true, `errors: ${JSON.stringify(result.errors)}`);
+});
+
+test('bonfire-h-review: condition missing text field fails', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = {
+    verdict: 'approved_with_conditions',
+    reason: 'ok',
+    conditions: [{ target_stage: 'stage-j' }],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /text/.test(e)));
+});
+
+test('bonfire-h-review: condition missing target_stage field fails', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = {
+    verdict: 'approved_with_conditions',
+    reason: 'ok',
+    conditions: [{ text: 'rewrite' }],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /target_stage/.test(e)));
+});
+
+test('bonfire-h-review: condition target_stage other than stage-j fails', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = {
+    verdict: 'approved_with_conditions',
+    reason: 'ok',
+    conditions: [{ text: 'enumerate categories', target_stage: 'stage-c' }],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /target_stage/.test(e)));
+});
+
+test('bonfire-h-review: verdict without conditions field still passes', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = { verdict: 'approved', reason: 'all good' };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, true);
+});
+
+test('bonfire-h-review: empty conditions array passes schema (Layer 1 catches emptiness)', () => {
+  const { validateDelta } = require('../bin/lib/delta-parser.cjs');
+  const delta = { verdict: 'approved_with_conditions', reason: 'ok', conditions: [] };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, true);
+});
