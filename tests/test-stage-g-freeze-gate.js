@@ -146,3 +146,39 @@ test('stage-g-freeze-gate skips all can_freeze=false categories (not just high_i
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('stage-g-freeze-gate does not partial-write when projected gate check fails', () => {
+  const dir = makeTmpDir();
+  try {
+    // Manually inject a propose event with an unknown category (simulating
+    // replay corruption or external tampering). This path the natural propose
+    // CLI would reject, but the invariant must still be defensive.
+    const historyPath = path.join(dir, '.bonfire', 'truth-surface', 'constraint-ledger-history.jsonl');
+    fs.appendFileSync(historyPath,
+      JSON.stringify({
+        type: 'propose',
+        id: 'CORRUPTED-1',
+        category: 'unknown_category',
+        content: 'x',
+        source: 'stage-a',
+        rationale: 'r',
+        notes: null,
+        timestamp: new Date().toISOString(),
+      }) + '\n'
+    );
+    execFileSync('node', [CLI, 'truth-rebuild'], { encoding: 'utf8', cwd: dir });
+
+    const historyLinesBefore = fs.readFileSync(historyPath, 'utf8').trim().split('\n').length;
+
+    const result = runGate(dir);
+    assert.notEqual(result.code, 0, 'should report unresolved');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /CORRUPTED-1/);
+
+    const historyLinesAfter = fs.readFileSync(historyPath, 'utf8').trim().split('\n').length;
+    assert.equal(historyLinesAfter, historyLinesBefore,
+      'no aligned_by update event should have been appended for the corrupted entry');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});

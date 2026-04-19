@@ -56,6 +56,17 @@ function stageGFreezeGate(root) {
     const alignedByNonEmpty = Array.isArray(entry.aligned_by) && entry.aligned_by.length > 0;
 
     if (status === 'PROPOSED' && challengedByEmpty) {
+      // Project the post-alignment state and verify the maturity gate would pass.
+      // Mirrors applyHRulings — prevents a stray aligned_by update event from
+      // being appended if freeze() would throw during execute (unknown category,
+      // replay corruption, etc.). Parity with fix f9fa9d12.
+      const projected = { ...entry, aligned_by: [...(entry.aligned_by || []), TOKEN_STAGE_G] };
+      try {
+        checkMaturityGate(projected);
+      } catch (err) {
+        summary.unresolved.push(id);
+        continue;
+      }
       update(root, { id, field: 'aligned_by', value: TOKEN_STAGE_G });
       freeze(root, { id });
       summary.autoAligned.push(id);
@@ -63,6 +74,14 @@ function stageGFreezeGate(root) {
     }
 
     if (status === 'CHALLENGED' && alignedByNonEmpty) {
+      // Defensive gate-check before freeze (no projection needed; entry already
+      // has both challenged_by and aligned_by populated).
+      try {
+        checkMaturityGate(entry);
+      } catch (err) {
+        summary.unresolved.push(id);
+        continue;
+      }
       freeze(root, { id });
       summary.frozen.push(id);
       continue;
