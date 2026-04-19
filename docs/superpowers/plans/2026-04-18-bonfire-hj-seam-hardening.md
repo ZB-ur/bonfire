@@ -528,6 +528,28 @@ test('extractSubstantiveTokens preserves numbers', () => {
   assert.ok(tokens.includes('5'));
 });
 
+test('extractSubstantiveTokens: CJK run is a single whole-string token, not per-char', () => {
+  const tokens = extractSubstantiveTokens('开始训练 和 重置统计');
+  assert.ok(tokens.includes('开始训练'), 'whole CJK segment should be a token');
+  assert.ok(tokens.includes('和'), 'single-char CJK between whitespace is a token');
+  assert.ok(tokens.includes('重置统计'), 'second whole segment is a token');
+  // Individual characters inside a segment must NOT appear as separate tokens —
+  // that would let "开 始 训 练" (comma-separated enumerations of single chars)
+  // authorize any recombination like "开训" or "始练". See spec §6.4.
+  assert.ok(!tokens.includes('开'), 'individual char inside segment must NOT be separate token');
+  assert.ok(!tokens.includes('训'), 'individual char inside segment must NOT be separate token');
+});
+
+test('extractSubstantiveTokens: mixed latin+CJK word (no whitespace) is a single token', () => {
+  const tokens = extractSubstantiveTokens('GTO训练器');
+  // Either "gto训练器" as a single token, or split on the latin/CJK boundary,
+  // is acceptable as long as the CJK segment is whole. Flexible assertion.
+  const hasWhole = tokens.includes('gto训练器');
+  const hasCjkSegment = tokens.includes('训练器');
+  assert.ok(hasWhole || hasCjkSegment, 'CJK segment preserved whole one way or another');
+  assert.ok(!tokens.includes('训'), 'no per-char split');
+});
+
 // ---------------------------------------------------------------------------
 // lemmatizeToken
 // ---------------------------------------------------------------------------
@@ -632,32 +654,31 @@ function loadFormatWhitelist() {
 
 // Split on whitespace and ASCII punctuation EXCEPT hyphens inside identifiers.
 // Preserves CON-014, stage-j, hand-strength as single tokens.
-// Lowercases everything.
+// Preserves CJK runs as single whole-string tokens (NOT per-character) —
+// matches spec §6.4 "tokenized by whitespace/punctuation boundaries and compared
+// literally". Per-char tokenization would let enumerations of individual chars
+// authorize arbitrary recombinations.
+// Lowercases latin runs.
 function extractSubstantiveTokens(text) {
   if (typeof text !== 'string') return [];
-  // Separate CJK characters into their own tokens (each char is a token)
-  // while keeping latin runs intact.
+  const boundaryRegex = /[\s.,;:!?()\[\]{}"'`]/;
   const tokens = [];
-  const cjkRegex = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/;
   let buffer = '';
-  const flushBuffer = () => {
+  const flush = () => {
     if (buffer.length === 0) return;
-    // Split buffer on whitespace + non-hyphen punctuation
-    for (const raw of buffer.split(/[\s.,;:!?()\[\]{}"'`]+/)) {
-      if (raw.length === 0) continue;
-      tokens.push(raw.toLowerCase());
-    }
+    // Latin gets lowercased; CJK is case-insensitive already. A run with mixed
+    // CJK + latin is lowercased wholesale (JS toLowerCase leaves CJK unchanged).
+    tokens.push(buffer.toLowerCase());
     buffer = '';
   };
   for (const ch of text) {
-    if (cjkRegex.test(ch)) {
-      flushBuffer();
-      tokens.push(ch);  // each CJK char is its own token
+    if (boundaryRegex.test(ch)) {
+      flush();
     } else {
       buffer += ch;
     }
   }
-  flushBuffer();
+  flush();
   return tokens;
 }
 
@@ -709,6 +730,22 @@ const VERB_BLACKLIST = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Paraphrase patterns — multi-word regexes that catch blacklisted intent
+// dressed up in language that avoids the single-word verb set. Per spec §6.2
+// "Also reject common paraphrases: 'document each', 'for each … produce',
+// 'give … for every'." Extend conservatively: every new pattern must be
+// grounded in an adversarial fixture, never speculation.
+// ---------------------------------------------------------------------------
+
+const PARAPHRASE_PATTERNS = [
+  /\bdocument each\b/i,
+  /\bfor each\s+\w+\s+(produce|provide|give|return|emit|write|output)\b/i,
+  /\bgive\s+\w+\s+for every\b/i,
+  /\bwrite out every\b/i,
+  /\bone per\s+\w+\b/i,  // e.g. "one per category" — enumeration by another name
+];
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -718,6 +755,7 @@ module.exports = {
   lemmatizeToken,
   isCJKToken,
   VERB_BLACKLIST,
+  PARAPHRASE_PATTERNS,
 };
 ```
 
@@ -748,20 +786,26 @@ New module bin/lib/seam-validation.cjs holds helpers shared by Layer 1
 
   extractSubstantiveTokens(text) — splits text on whitespace and
     punctuation (preserving hyphenated identifiers like CON-014),
-    lowercases, treats each CJK character as its own token.
+    lowercases, preserves CJK runs as whole-string tokens (NOT
+    per-character — per-char tokenization would let a list of single
+    CJK chars authorize arbitrary recombinations; see spec §6.4).
 
   lemmatizeToken(token) — latin-only rule-based: drops trailing
     ing/ed/es/s for tokens >=4 chars. Preserves identifiers and CJK.
 
   isCJKToken(token) — conservative: any CJK char makes the token CJK.
 
-  VERB_BLACKLIST — Set of verbs whose presence in a condition text
-    triggers Layer 1 rejection.
+  VERB_BLACKLIST — Set of single-word verbs whose presence in a
+    condition text triggers Layer 1 rejection.
+
+  PARAPHRASE_PATTERNS — regex list that catches multi-word dodges of
+    the verb blacklist (e.g. "document each", "for each X produce Y"
+    — spec §6.2). Integrated into validateHConditions in Task 6.
 
 Unit tests at tests/test-seam-validation.js pin all of the above
 against their contracts. No CLI or validator wiring in this commit.
 
-Spec §6.4 edge cases + CJK handling.
+Spec §6.2 paraphrases + §6.4 CJK handling.
 EOF
 )"
 ```
@@ -828,6 +872,32 @@ test('validateHConditions: condition with verb blacklist word fails', () => {
   const result = validateHConditions(verdict, snapshot);
   assert.equal(result.valid, false);
   assert.ok(result.violations.some(v => /enumerate/.test(v.reason)));
+});
+
+test('validateHConditions: paraphrase pattern "document each" fails even with no blacklisted verb', () => {
+  const snapshot = mkSnapshot({
+    'CON-014': { status: 'FROZEN', content: 'board texture', category: 'frozen_constraint' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'handoff MUST document each board texture', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /paraphrase|document each/i.test(v.reason)));
+});
+
+test('validateHConditions: paraphrase pattern "for each X produce Y" fails', () => {
+  const snapshot = mkSnapshot({
+    'CON-020': { status: 'FROZEN', content: 'hand strength categories', category: 'frozen_constraint' },
+  });
+  const verdict = {
+    verdict: 'approved_with_conditions', reason: 'x',
+    conditions: [{ text: 'for each hand strength produce a row', target_stage: 'stage-j' }],
+  };
+  const result = validateHConditions(verdict, snapshot);
+  assert.equal(result.valid, false);
+  assert.ok(result.violations.some(v => /paraphrase|for each/i.test(v.reason)));
 });
 
 test('validateHConditions: condition with orphan substantive token fails', () => {
@@ -929,6 +999,22 @@ function validateHConditions(verdict, snapshot) {
     const text = cond && cond.text ? String(cond.text) : '';
     const condTokens = extractSubstantiveTokens(text);
 
+    // Rule 1.5: paraphrase patterns — multi-word regexes that catch dodges
+    // of the single-word verb blacklist. Scanned BEFORE verb blacklist so
+    // that paraphrase-caught conditions get the specific paraphrase reason.
+    let paraphraseHit = false;
+    for (const pat of PARAPHRASE_PATTERNS) {
+      if (pat.test(text)) {
+        violations.push({
+          index: i,
+          reason: `condition text matches blacklisted paraphrase pattern "${pat.source}" — use rejected + appropriate conflict_type instead`,
+        });
+        paraphraseHit = true;
+        break;
+      }
+    }
+    if (paraphraseHit) continue;  // skip further rules for this condition; one violation per condition is enough
+
     // Rule 2: verb blacklist
     for (const token of condTokens) {
       if (VERB_BLACKLIST.has(token)) {
@@ -998,24 +1084,29 @@ git commit -m "$(cat <<'EOF'
 feat(seam-validation): add validateHConditions (Layer 1 helper)
 
 Core Layer 1 logic: given an H-Review verdict and a FROZEN ledger
-snapshot, verify each stage-j condition's token coverage and verb
-blacklist. Returns { valid, violations: [{ index, reason }] }.
+snapshot, verify each stage-j condition's token coverage, paraphrase
+patterns, and verb blacklist. Returns { valid, violations: [{ index,
+reason }] }.
 
-Rules enforced:
+Rules enforced (in order):
 - approved_with_conditions with empty conditions[] is a violation
   (nudges H-Review toward verdict: "approved" when no format work
   needed).
-- Verb blacklist: enumerate, classify, define, specify, etc. (full
-  list in VERB_BLACKLIST from Task 5).
+- Paraphrase patterns: multi-word regexes (PARAPHRASE_PATTERNS from
+  Task 5) catch dodges of the single-word verb set — e.g.
+  "document each", "for each X produce Y". Scanned before the verb
+  blacklist so the violation reason is specific.
+- Verb blacklist: enumerate, classify, define, specify, etc.
 - Token coverage: every substantive token (non-stopword, non-format-
   keyword) must appear in FROZEN ledger content or the format
   whitelist.
-- CJK tokens are exact-match (no lemmatization per spec §6.4).
+- CJK tokens are whole-string literal-match (no lemmatization per
+  spec §6.4).
 
 Pure function — no I/O beyond the one-time whitelist file load. CLI
 wrapping follows in Task 7.
 
-Spec §6.2 (Layer 1 rules).
+Spec §6.2 (Layer 1 rules, paraphrases).
 EOF
 )"
 ```
@@ -1913,9 +2004,9 @@ function validateHandoff(compileOutput, context) {
       );
     }
     return {
-      valid: errors.length === 0 ? false : false,  // always invalid when reentry_request present (it's not a code-ready package)
+      valid: false,  // never valid: reentry_request means "refuse to compile", not a code-ready package
       errors,
-      reentry_request: errors.length === 0 ? req : null,  // only surface if no consistency error
+      reentry_request: errors.length === 0 ? req : null,  // only surface when consistency check passed
     };
   }
 
@@ -2790,13 +2881,13 @@ Create `tests/fixtures/hj-seam-adversarial/each-evades-enumerate/README.md`:
 # each-evades-enumerate
 
 **Attack:** The condition uses "document each" as a paraphrase of "enumerate" to
-sidestep the literal verb blacklist.
+sidestep the single-word verb blacklist. A naive attacker uses `enumerate`; a
+slightly more sophisticated one uses a paraphrase that means the same thing.
 
-**Expected catch:** Layer 1 verb blacklist must include `each` paraphrases (the
-blacklist in Task 5 includes `each` as part of the list-verb matching).
-
-**Current behavior tested:** `validate-h-conditions` rejects this verdict with
-a violation mentioning the blacklisted pattern.
+**Expected catch:** Layer 1 `PARAPHRASE_PATTERNS` (seam-validation.cjs, Task 5)
+includes `\bdocument each\b`. The fixture test asserts the violation reason
+names the paraphrase — NOT an orphan-token coincidence. If someone later
+removes the pattern from the regex list, this fixture fails loudly.
 
 **File list:**
 - `h-review-verdict.json`
@@ -2813,8 +2904,6 @@ Create `tests/fixtures/hj-seam-adversarial/each-evades-enumerate/h-review-verdic
   ]
 }
 ```
-
-(Note: strictly this requires extending the verb blacklist or adding a pattern match. For the adversarial fixture to catch it, consider: (a) add `each` to the blacklist in Task 5 if it isn't, OR (b) add an orphan-token check — "board texture scenario" tokens won't all be in a FROZEN ledger if the ledger doesn't mention scenarios. The fixture test should assert the rejection comes from SOME layer, not a specific one.)
 
 Create `tests/fixtures/hj-seam-adversarial/wrong-stage-j/README.md`:
 
@@ -2974,13 +3063,17 @@ test('fixture: condition-demands-field-add is caught by Layer 1', () => {
   }
 });
 
-test('fixture: each-evades-enumerate is caught by Layer 1 (orphan token or blacklist)', () => {
+test('fixture: each-evades-enumerate is caught by Layer 1 paraphrase pattern', () => {
   const dir = makeTmpDir();
   try {
     installFixture(dir, 'each-evades-enumerate');
     const result = runValidateConditions(dir);
-    // Token "scenario" may not be in ledger → orphan. Acceptable catch path.
     assert.notEqual(result.code, 0);
+    const out = result.stdout + result.stderr;
+    // Must be caught by the paraphrase pattern specifically, not by
+    // accidental orphan-token coincidence. If a future change makes the
+    // pattern too narrow, this assertion flags the regression.
+    assert.match(out, /paraphrase|document each/i);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
