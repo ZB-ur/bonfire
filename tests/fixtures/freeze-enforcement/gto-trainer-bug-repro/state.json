@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "created_at": "2026-04-11T16:04:52.721Z",
+  "updated_at": "2026-04-11T17:57:54.917Z",
+  "pipeline_stage": "plan",
+  "current_step": "stage-g",
+  "steps": {
+    "stage-a": { "status": "passed", "pipeline": "pre", "passed_at": "2026-04-11T17:39:41.596Z" },
+    "stage-b": { "status": "passed", "pipeline": "plan", "passed_at": "2026-04-11T17:41:27.876Z" },
+    "stage-c": { "status": "passed", "pipeline": "plan", "passed_at": "2026-04-11T17:42:49.689Z" },
+    "stage-d": { "status": "passed", "pipeline": "plan", "passed_at": "2026-04-11T17:45:03.019Z" },
+    "stage-e": { "status": "passed", "pipeline": "plan", "passed_at": "2026-04-11T17:45:34.677Z" },
+    "stage-f": { "status": "passed", "pipeline": "plan", "passed_at": "2026-04-11T17:46:00.045Z" },
+    "stage-g": { "status": "running", "pipeline": "plan", "started_at": "2026-04-11T17:49:46.236Z" }
+  },
+  "approval": {
+    "stage_a_approved": true,
+    "stage_a_approved_at": "2026-04-11T17:39:41.949Z"
+  },
+  "reentry": { "depth": 0, "max_depth": 2, "history": [] },
+  "pending_reentry": null,
+  "runs": { "current_run_id": null, "completed_runs": [] }
+}

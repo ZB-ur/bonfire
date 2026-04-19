@@ -1,0 +1,15 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "Conditions addressable in J-Compile",
+  "conflict_type": null,
+  "conditions": [
+    "J-Compile MUST enumerate board textures"
+  ],
+  "rulings": [
+    { "action": "freeze", "id": "CON-002" },
+    { "action": "freeze", "id": "CON-007" },
+    { "action": "freeze", "id": "CON-012" },
+    { "action": "freeze", "id": "ACC-001" },
+    { "action": "freeze", "id": "DEP-001" }
+  ]
+}

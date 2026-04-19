@@ -199,3 +199,84 @@ test('state-advance from stage-h allows when ruling is redundant (target already
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Regression: reproduce gto-trainer freeze-bug and verify the new gates catch it
+// ---------------------------------------------------------------------------
+
+const FIXTURE_DIR = path.join(__dirname, 'fixtures', 'freeze-enforcement', 'gto-trainer-bug-repro');
+
+function loadFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bonfire-fixture-'));
+  const bonfireDir = path.join(dir, '.bonfire');
+  fs.mkdirSync(path.join(bonfireDir, 'truth-surface'), { recursive: true });
+  fs.mkdirSync(path.join(bonfireDir, 'plan'), { recursive: true });
+
+  fs.copyFileSync(
+    path.join(FIXTURE_DIR, 'constraint-ledger-history.jsonl'),
+    path.join(bonfireDir, 'truth-surface', 'constraint-ledger-history.jsonl')
+  );
+  fs.copyFileSync(
+    path.join(FIXTURE_DIR, 'h-review-verdict.json'),
+    path.join(bonfireDir, 'plan', 'h-review-verdict.json')
+  );
+  fs.copyFileSync(
+    path.join(FIXTURE_DIR, 'state.json'),
+    path.join(bonfireDir, 'state.json')
+  );
+
+  // Rebuild snapshot from history.
+  execFileSync('node', [CLI, 'truth-rebuild'], { encoding: 'utf8', cwd: dir });
+
+  return dir;
+}
+
+test('regression: gto-trainer fixture — stage-g advance blocks on stuck PROPOSED entries', () => {
+  const dir = loadFixture();
+  try {
+    const result = runAdvance(dir, 'stage-g');
+    assert.notEqual(result.code, 0);
+
+    const out = result.stdout + result.stderr;
+    // Should list the 5 PROPOSED entries (risk excluded).
+    for (const id of ['CON-002', 'CON-007', 'CON-012', 'ACC-001', 'DEP-001']) {
+      assert.match(out, new RegExp(id));
+    }
+    // Should NOT list the risk.
+    assert.doesNotMatch(out, /RISK-001/);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('regression: gto-trainer fixture — after stage-g-freeze-gate, stage-g advance succeeds', () => {
+  const dir = loadFixture();
+  try {
+    execFileSync('node', [CLI, 'stage-g-freeze-gate'], { encoding: 'utf8', cwd: dir });
+    const result = runAdvance(dir, 'stage-g');
+    assert.equal(result.code, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('regression: gto-trainer fixture — after stage-g freezes, stage-h advance blocks until rulings applied', () => {
+  const dir = loadFixture();
+  try {
+    execFileSync('node', [CLI, 'stage-g-freeze-gate'], { encoding: 'utf8', cwd: dir });
+    // Move pipeline pointer to stage-h.
+    const statePath = path.join(dir, '.bonfire', 'state.json');
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    state.steps['stage-g'] = { status: 'passed', pipeline: 'plan', passed_at: new Date().toISOString() };
+    state.current_step = 'stage-h';
+    state.steps['stage-h'] = { status: 'running', pipeline: 'plan', started_at: new Date().toISOString() };
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+
+    // Stage G already froze all 5 — verdict rulings are redundant. State-comparison
+    // should treat them as trivially satisfied (targets already FROZEN).
+    const result = runAdvance(dir, 'stage-h');
+    assert.equal(result.code, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
