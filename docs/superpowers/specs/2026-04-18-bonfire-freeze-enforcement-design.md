@@ -60,12 +60,14 @@ Two additions to `bin/bonfire-tools.cjs`, backed by helpers in `bin/lib/truth-su
   1. Load verdict, validate via `validateDelta("bonfire-h-review", verdict)` (the existing `delta-parser.validateDelta` dispatch).
   2. Load current ledger snapshot.
   3. Filter `rulings[]` to entries with `action ∈ {freeze, supersede}`. Other action values (if any are ever added) are ignored by this command.
-  4. Pre-validate every filtered ruling:
-     - Target id exists.
-     - `freeze` rulings: target is not already `FROZEN` (already-frozen is treated as idempotent skip, not a failure); after planned auto-alignment (§5.3) the target would satisfy `checkMaturityGate`.
-     - `supersede` rulings: target (`supersedes`) is `FROZEN`; new id does not yet exist. (Auto-alignment does not apply — supersede operates on already-frozen entries.)
-  5. If any ruling fails pre-validation, print all failures and exit non-zero without writing any events.
-  6. Otherwise emit the planned event sequence (per ruling: optional `update aligned_by` followed by `freeze`, or single `supersede`) in ruling order, append to `constraint-ledger-history.jsonl`, then `regenerateSnapshot`.
+  4. Classify every filtered ruling:
+     - `freeze` ruling whose target is already `FROZEN` → mark as **idempotent skip**: not counted as a failure, no event emitted for it. Continue classifying remaining rulings.
+     - All other rulings → run **pre-validation**:
+       - Target id exists.
+       - `freeze` rulings: after planned auto-alignment (§5.3) the target would satisfy `checkMaturityGate`.
+       - `supersede` rulings: target (`supersedes`) is `FROZEN`; new id does not yet exist. (Auto-alignment does not apply — supersede operates on already-frozen entries.)
+  5. If any non-skip ruling fails pre-validation, print all failures and exit non-zero without writing any events. Skipped rulings are reported in the output but do not participate in the failure count.
+  6. Otherwise emit the planned event sequence (per non-skip ruling: optional `update aligned_by` followed by `freeze`, or single `supersede`) in ruling order, append to `constraint-ledger-history.jsonl`, then `regenerateSnapshot`.
 - Idempotent: `freeze` rulings targeting already-`FROZEN` ids are reported as skipped but do not fail the run.
 - Zero-rulings verdict (`rulings: []` or field absent): no events written, exit 0.
 - Exit code 0 on full success (including idempotent skips); non-zero on any hard failure.
@@ -93,7 +95,18 @@ Modify `bin/lib/state.cjs` (or the `state-advance` handler in `bonfire-tools.cjs
 | Advancing from | Invariant | On failure stderr prints |
 |---|---|---|
 | `stage-g` | No entries remain in `PROPOSED` or `CHALLENGED` status, excluding `high_impact_risk` category. | `Cannot advance from stage-g: N entries still unresolved:` followed by one id per line, then `Run: bonfire stage-g-freeze-gate`. |
-| `stage-h` | For every `rulings[]` entry in `.bonfire/plan/h-review-verdict.json` whose `action ∈ {freeze, supersede}`: `freeze(id=X)` → `snapshot.entries[X].status == "FROZEN"`; `supersede(supersedes=Y, id=X)` → `snapshot.entries[Y].status == "SUPERSEDED"` AND `snapshot.entries[X].status == "FROZEN"`. A verdict with `rulings: []` or no `rulings` field passes trivially. | `Cannot advance from stage-h: N rulings not satisfied:` followed by one line per ruling (`<id> (expected=FROZEN, actual=<status>)` or the supersede equivalent), then `Run: bonfire apply-h-rulings`. |
+| `stage-h` | For every `rulings[]` entry in `.bonfire/plan/h-review-verdict.json` whose `action ∈ {freeze, supersede}`: `freeze(id=X)` → `snapshot.entries[X].status == "FROZEN"`; `supersede(supersedes=Y, id=X)` → `snapshot.entries[Y].status == "SUPERSEDED"` AND `snapshot.entries[X].status == "FROZEN"` (both conditions must pass independently; a failing supersede reports each condition's expected/actual). A verdict with `rulings: []` or no `rulings` field passes trivially. | See sample below. |
+
+Sample failure output for Stage H:
+
+```
+Cannot advance from stage-h: 2 rulings not satisfied:
+  - freeze(id=old-ui-assumption) expected=FROZEN actual=PROPOSED
+  - supersede(supersedes=legacy-auth, id=new-auth) expected: legacy-auth=SUPERSEDED, new-auth=FROZEN; actual: legacy-auth=FROZEN, new-auth=<missing>
+Run: bonfire apply-h-rulings
+```
+
+Each `freeze` ruling emits a single expected/actual line. Each `supersede` ruling emits both conditions on one line so that callers can see which end failed (old entry not superseded, or new entry missing/wrong status) without cross-referencing the verdict file.
 
 Both gates exit non-zero when the invariant fails and do not mutate state. Remediation hint always points to the corresponding command above, even though in rare cases the state could have been satisfied by another path (e.g., an id that Stage G already froze is trivially satisfied by a redundant H-Review ruling — no additional command needed, but the hint stays consistent for orchestrator simplicity).
 
@@ -146,6 +159,8 @@ Outcomes:
 - For categories whose maturity gate is a no-op today (`confirmed_fact` with `evidence_required`, `dependency_chain` with `refs_valid`), the auto-alignment is harmless — the extra `update` event costs one jsonl line and records a forensic trail even though the gate would have passed without it. No conditional logic is needed in either command based on the target's category.
 
 Schema file (`schemas/bonfire-v1.json`) is untouched — the gate name is unchanged, only its code body expands. `aligned_by` is already in `annotate_whitelist` and the replay reducer already handles array-append updates.
+
+**External contract impact:** This gate extension applies to all callers of `truth-freeze`, including direct `bonfire truth-freeze X` CLI invocations — not only the two new commands. The effect is additive: every freeze call that succeeded before still succeeds, and some calls that previously failed with `Maturity gate failed` will now succeed if the target has non-empty `aligned_by`. No existing freeze flow is newly rejected. Third-party scripts or workflows that relied on the stricter gate should be aware of this softening; the behavior is documented in the changelog entry for this change.
 
 ### 5.4 Skill rewrites
 
@@ -219,6 +234,7 @@ The gate-extension in §5.3(a) expands what `checkMaturityGate` accepts. Existin
 | `stage-g-freeze-gate` masking a real G-Blue gap by auto-aligning genuinely contested entries | Rules strictly gate auto-align on `challenged_by: []`. If an entry has challenges, the command refuses to align silently and surfaces the gap. |
 | Existing cases in flight break when installed | The gate runs on every `state-advance`. Pre-existing `.bonfire/` with stale PROPOSED state will be blocked next run — this is the intended behavior. Document in commit message. |
 | State-comparison invariant cannot distinguish "H-Review's ruling caused this freeze" from "some other path already froze it" | This is an accepted tradeoff of the state-based approach. Forensic attribution lives in the `aligned_by` field: searching for `"stage-h-ruling"` / `"stage-g-survival"` tokens answers "which path authorized freezing X?". If a future observability spec adds a verdict application log, it can layer on top without changing the gate semantics. |
+| `checkMaturityGate` extension changes `bonfire truth-freeze` behavior globally (not just inside the two new commands) | Additive only: no previously-valid freeze starts failing. Previously-rejected freezes on entries with non-empty `aligned_by` now succeed. Document in commit message and changelog so third-party scripts or manual workflows that relied on the stricter gate are aware of the softening. |
 
 ## 8. Deferred Questions
 
