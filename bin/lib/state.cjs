@@ -98,12 +98,29 @@ function checkStageGInvariant() {
 
 function checkStageHInvariant() {
   const { loadSnapshot } = require('./truth-surface.cjs');
+  const { validateDelta } = require('./delta-parser.cjs');
   const root = getRoot();
   const dir = path.dirname(root);
   const verdictPath = path.join(root, 'plan', 'h-review-verdict.json');
 
-  const verdict = loadJSON(verdictPath);
-  if (!verdict) exitError(`h-review-verdict.json not found at ${verdictPath}`, [], 3);
+  let verdict;
+  try {
+    verdict = JSON.parse(fs.readFileSync(verdictPath, 'utf8'));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      exitError(`h-review-verdict.json not found at ${verdictPath}`, [], 3);
+    }
+    exitError(`h-review-verdict.json unreadable at ${verdictPath}: ${err.message}`, [], 3);
+  }
+
+  const validation = validateDelta('bonfire-h-review', verdict);
+  if (!validation.valid) {
+    exitError(
+      `h-review-verdict.json failed schema validation: ${validation.errors.join('; ')}`,
+      [],
+      3
+    );
+  }
 
   const rulings = Array.isArray(verdict.rulings) ? verdict.rulings : [];
   const filtered = rulings.filter(r => r.action === 'freeze' || r.action === 'supersede');

@@ -284,3 +284,44 @@ test('regression: gto-trainer fixture — stage-h advance passes trivially when 
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Invariant hardening: schema validation + precise error on corrupt file
+// ---------------------------------------------------------------------------
+
+test('state-advance from stage-h fails fast on schema-invalid verdict', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    // Verdict missing required `verdict` field — bonfire-h-review schema violation.
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({ reason: 'missing verdict field', rulings: [] }, null, 2));
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.notEqual(result.code, 0, 'should reject schema-invalid verdict');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /schema validation/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('state-advance from stage-h distinguishes missing vs corrupted verdict file', () => {
+  const dir = makeTmpDir();
+  try {
+    setPipelineToStageH(dir);
+    // Corrupted (unparseable JSON) — must not be conflated with "not found".
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, '{ not valid json');
+
+    const result = runAdvance(dir, 'stage-h');
+    assert.notEqual(result.code, 0);
+    const out = result.stdout + result.stderr;
+    assert.match(out, /unreadable/i);
+    assert.doesNotMatch(out, /not found/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
