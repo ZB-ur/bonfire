@@ -3,7 +3,7 @@
   "reason": "Conditions addressable in J-Compile",
   "conflict_type": null,
   "conditions": [
-    "J-Compile MUST enumerate board textures"
+    { "text": "J-Compile MUST enumerate board textures", "target_stage": "stage-j" }
   ],
   "rulings": [
     { "action": "freeze", "id": "CON-002" },

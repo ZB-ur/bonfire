@@ -32,7 +32,7 @@ test('CLI route --list returns all conflict types', () => {
   assert.equal(result.goal_conflict.to, 'stage-a');
   assert.equal(result.goal_conflict.crosses_pipeline, true);
   assert.ok(result.requirement_conflict);
-  assert.equal(Object.keys(result).length, 9);
+  assert.equal(Object.keys(result).length, 11);
 });
 
 test('CLI route --conflict-type returns specific route', () => {
@@ -88,10 +88,10 @@ test('schema note requires reference valid ids', () => {
   }
 });
 
-test('schema has 9 reentry routes', () => {
+test('schema has 11 reentry routes', () => {
   const { loadSchema } = require('../bin/lib/utils.cjs');
   const schema = loadSchema();
-  assert.equal(Object.keys(schema.reentry_routes).length, 9);
+  assert.equal(Object.keys(schema.reentry_routes).length, 11);
 });
 
 test('schema reentry route targets are valid steps', () => {
