@@ -67,6 +67,35 @@ function initPipelineSteps(schema, pipelineStage) {
   return steps;
 }
 
+// ─── Invariant gates ─────────────────────────────────────────────────────────
+
+function checkStageGInvariant() {
+  const { loadSnapshot } = require('./truth-surface.cjs');
+  const root = getRoot();
+  const dir = path.dirname(root);
+  const snapshot = loadSnapshot(dir);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  const unresolved = [];
+  for (const [id, entry] of Object.entries(entries)) {
+    if (entry.category === 'high_impact_risk') continue;
+    if (entry.status === 'PROPOSED' || entry.status === 'CHALLENGED') {
+      unresolved.push(id);
+    }
+  }
+
+  if (unresolved.length > 0) {
+    process.stderr.write(
+      `Cannot advance from stage-g: ${unresolved.length} entries still unresolved:\n`
+    );
+    for (const id of unresolved) {
+      process.stderr.write(`  - ${id}\n`);
+    }
+    process.stderr.write(`Run: bonfire stage-g-freeze-gate\n`);
+    process.exit(1);
+  }
+}
+
 // ─── Exported command handlers ────────────────────────────────────────────────
 
 function stateRead(args) {
@@ -123,6 +152,11 @@ function stateAdvance(args) {
 
   if (!stepName) {
     exitError('Usage: state-advance --step <name>', [], 2);
+  }
+
+  // Invariant gates: refuse to advance when ledger state violates contract.
+  if (stepName === 'stage-g') {
+    checkStageGInvariant();
   }
 
   const schema = getSchema();
