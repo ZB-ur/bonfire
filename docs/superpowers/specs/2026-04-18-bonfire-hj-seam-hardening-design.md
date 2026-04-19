@@ -106,6 +106,8 @@ Three defense layers plus a prompt/behavior layer, each targeting a distinct fai
 
 Legacy free-string conditions no longer validate. Every condition must now be `{ text: string, target_stage: "stage-j" }`. The enum is a single value — `target_stage` exists for future extensibility (e.g., a stage-h-self condition) but currently admits only stage-j.
 
+**Note on validator dispatch:** `condition_item_shape` is the first constraint in `bonfire-v1.json` that requires per-item validation inside a delta array. `bin/lib/delta-parser.cjs:validateDelta` currently only handles flat constraint keys (`*_min_length`, `verdict_enum`, `conflict_type_*`). This constraint needs a **targeted** dispatch branch: iterate `delta.conditions[]` and verify `required_fields` + `target_stage_enum` per item. Keep this branch targeted; do NOT introduce a generic nested-schema dispatcher or pull in a JSON Schema subset — defer that generalization until a second same-shape constraint appears.
+
 **`schemas/bonfire-v1.json`** — add a new top-level section `handoff_substantive_slots`:
 
 ```json
@@ -121,6 +123,17 @@ Legacy free-string conditions no longer validate. Every condition must now be `{
 ```
 
 This is the **substantive slot whitelist** expressed at schema level, not hardcoded in the validator. When a future slot is added to the handoff shape, the schema author must either list it here (provenance required) or consciously decide to omit it. There is no "forget to update the validator" failure mode.
+
+**J-Compile output schema extension — BLOCKED state:** When J-Compile determines during execution that an approved stage-j condition cannot be fulfilled without inventing content, it must not invent and must not produce a pass-through compile-output. Extend the compile-output schema to accept a `reentry_request` field on the top-level handoff:
+
+```json
+"reentry_request": {
+  "conflict_type": "invalid_stage_j_condition",
+  "reason": "<human-readable explanation naming the specific condition index and the missing source coverage>"
+}
+```
+
+When `reentry_request` is present, `code_ready` MUST be `false`. `handoff-validate` detects this shape and emits the declared `conflict_type` to the caller without running Layer 2a/2b — the request IS the signal. This keeps validator responsibility clean: "validate a compile product that claims to be complete" vs "detect that J is refusing to complete." Explicit field, explicit semantics.
 
 **`schemas/bonfire-v1.json#reentry_routes`** — add two routes:
 
@@ -154,6 +167,8 @@ Behavior:
 
 ### 6.3 Layer 2a — structural provenance
 
+**Whitelist semantics — conditional trigger, not mandatory production.** The `handoff_substantive_slots` whitelist declares: *if J-Compile produces a slot listed here, then it must carry provenance metadata*. The whitelist does NOT require J-Compile to produce every listed slot. Slots that legitimately don't apply to a given case (e.g., no UI panels in a CLI-only tool) are simply absent from compile-output — no error. This prevents the whitelist from being misread as a mandatory output contract.
+
 **Compile-output contract change.** Every slot marked `_provenance_required: true` in `handoff_substantive_slots` must carry two additional fields:
 
 ```json
@@ -167,6 +182,8 @@ Behavior:
 Slots with `kind: per_entry` require these fields on each entry (e.g., each entity in `domain_model.entities`, each function contract). Slots with `kind: whole_section` require them at the section root.
 
 The optional `fields` list in a slot annotation (e.g., `function_contracts` has `fields: ["purpose", "invariants", "failure_modes"]`) does NOT restrict where provenance attaches — provenance always attaches at the annotated slot level. The `fields` list tells Layer 2b which sub-fields within an entry to include in the token extraction. Structural sub-fields like `id`, `name`, `signature`, `location` are excluded from token matching because they carry engineering-choice content (file paths, identifiers) rather than product semantics. This is a per-slot author decision made once in the schema.
+
+**Default extraction when `fields` is absent:** For `kind: whole_section` slots without a `fields` declaration (e.g., `data_contract`), Layer 2b recursively walks all string-valued leaves beneath the slot root and extracts tokens from them; JSON keys are not tokenized. For `kind: per_entry` slots without `fields` (e.g., `domain_model.entities` if its annotation omitted `fields`), the same rule applies per entry. This makes the annotation terse for slots where "all prose is substantive" is the right default, while preserving the ability to narrow via `fields` when a slot mixes structural and prose content.
 
 **`bin/lib/schema.cjs:validateHandoff`** is extended with a new pass. After the existing field-presence checks:
 
@@ -201,6 +218,7 @@ Given a provenanced slot passed Layer 2a, verify that its content doesn't smuggl
 - Multi-word phrases: matched as individual tokens. `"board texture"` splits into `board` and `texture`, each checked separately.
 - Numbers: substantive. `10` in slot content requires `10` or an equivalent numeric expression in source.
 - Proper nouns (e.g., `BTN`, `CON-014`): substantive, must be in source or schema vocabulary.
+- **CJK (Chinese, Japanese, Korean) text — known gap.** The lemmatization rules above are latin-specific. CJK text is tokenized by whitespace/punctuation boundaries and compared literally; no word-form normalization is applied. This means a CJK UI string produced by J-Compile (e.g., Chinese drill titles) must match CJK tokens present in the FROZEN ledger or in a stage-j condition *exactly*. This is intentionally strict — if a ledger entry doesn't specify the exact Chinese copy, J-Compile cannot invent it. For legitimate cases where the ledger approves "a Chinese title" without specifying exact text, the fix is an explicit stage-j condition that carries the approved text. The `cross-language-smuggle/` adversarial fixture (§7.6) pins this behavior. A future enhancement could introduce a CJK-aware tokenizer, but not in this spec.
 
 **Integration:** `validateHandoff` extended with Layer 2b pass after Layer 2a. On orphan tokens: fail and emit the `handoff_provenance_failure` conflict_type (defined in §6.1), which routes to stage-h.
 
@@ -238,6 +256,14 @@ For each gap you identify in the A-G package:
     → approved_with_conditions + condition targeting stage-j.
     MUST verify: every substantive noun in the condition text appears in
     the FROZEN ledger or in the handoff schema vocabulary.
+
+  Gap is ambiguous or fits multiple buckets?
+    → rejected + conflict_type: requirement_conflict (the most
+    conservative upstream stage).
+    NEVER default to approved_with_conditions when uncertain. The cost
+    of a false-positive reject is one reentry loop; the cost of a
+    false-positive approve is J-Compile inventing product semantics.
+    The former is recoverable; the latter is the bug we are fixing.
 </decision_tree>
 ```
 
@@ -258,8 +284,21 @@ the diff is mechanical.
 
 If a condition asks you to produce content for which no source is adequate
 (the condition passed Layer 1 entry check but in execution you find no
-way to write the slot without inventing), halt with status `BLOCKED` and
-emit `conflict_type: invalid_stage_j_condition`. Do not invent.
+way to write the slot without inventing), do NOT produce a pass-through
+compile-output. Instead, emit a top-level `reentry_request` field:
+
+```json
+{
+  "handoff": { "code_ready": false, ... },
+  "reentry_request": {
+    "conflict_type": "invalid_stage_j_condition",
+    "reason": "condition[<index>] '<excerpt>' requires inventing <what> — no adequate source coverage"
+  }
+}
+```
+
+`handoff-validate` detects this shape and triggers the declared reentry
+back to stage-h. Do not invent. Do not partial-fill with placeholders.
 </provenance_rules>
 ```
 
@@ -349,6 +388,9 @@ Known attack surface (initial fixtures):
 - `wrong-stage-j/` — H-Review writes a condition with `target_stage: "stage-c"` (not `stage-j`). Schema validation must catch.
 - `condition-demands-field-add/` — condition says `"add a risk_level field"`. Defines a new semantic field. Layer 1 must catch via blacklist + token rules.
 - `lemmatization-edge/` — source says `"classification algorithm"`, slot says `"classifier implementations"`. Is `classifier` a valid lemmatization of `classification`? Test pins the behavior; acceptable outcome either way as long as it's consistent.
+- `empty-conditions-verdict/` — `verdict: "approved_with_conditions"` with `conditions: []`. The intuition is that `approved_with_conditions` without actual conditions is semantic nonsense — the verdict type exists *because* there are format tasks to do. Pin behavior: Layer 1 (`validate-h-conditions`) **must fail** this shape, forcing H-Review to emit `verdict: "approved"` when it has no conditions. Prevents `approved_with_conditions` from being used as a mood-signal separate from its functional meaning.
+- `supersede-drift/` — compile-output slot declares `source_ref: CON-014` but at validation time CON-014 has been superseded by CON-014b (status SUPERSEDED). Layer 2a must fail: source_ref must resolve to a FROZEN (not SUPERSEDED) entry. Pins behavior against supersede-driven drift where the ledger moves underneath a stale compile-output.
+- `cross-language-smuggle/` — ledger is English (e.g., CON-007 `"Chinese language UI throughout"`), slot produces specific Chinese UI copy (`"开始训练"`, `"重置统计"`). The declared source (CON-007) contains no CJK tokens. Layer 2b's CJK handling (§6.4) must reject the orphan CJK tokens. The legitimate resolution path is for H-Review to emit a stage-j condition carrying the exact Chinese copy — which this fixture does NOT include. Accompanying the rejection, a separate positive-case fixture `cross-language-approved/` shows the compliant pattern: stage-j condition provides the exact text, slot cites the condition, Layer 2b passes.
 
 Each fixture's test asserts the exact layer at which it's caught. If all layers pass a fixture that should fail, that's a regression.
 
