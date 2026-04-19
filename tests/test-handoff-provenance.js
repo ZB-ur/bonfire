@@ -154,3 +154,77 @@ test('validateHandoff: whole_section slot (data_contract) validates at section r
   const result = validateHandoff(co, ctx);
   assert.equal(result.valid, true, `errors: ${JSON.stringify(result.errors)}`);
 });
+
+// ---------------------------------------------------------------------------
+// reentry_request handling
+// ---------------------------------------------------------------------------
+
+test('validateHandoff: reentry_request present + code_ready=false → valid returns false but with reentry signal', () => {
+  const co = {
+    handoff: {
+      code_ready: false,
+      handoff_summary: 'blocked',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'u1' }],
+    },
+    reentry_request: {
+      conflict_type: 'invalid_stage_j_condition',
+      reason: 'condition[0] asks J to define something not in ledger',
+    },
+  };
+  const result = validateHandoff(co, mkContext());
+  assert.equal(result.valid, false);  // not passable as code-ready
+  assert.ok(result.reentry_request, 'reentry_request should be surfaced');
+  assert.equal(result.reentry_request.conflict_type, 'invalid_stage_j_condition');
+});
+
+test('validateHandoff: reentry_request + code_ready=true → distinct consistency error', () => {
+  const co = {
+    handoff: {
+      code_ready: true,  // inconsistent!
+      handoff_summary: 'blocked',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'u1' }],
+    },
+    reentry_request: {
+      conflict_type: 'invalid_stage_j_condition',
+      reason: 'x',
+    },
+  };
+  const result = validateHandoff(co, mkContext());
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /reentry_request.*code_ready|code_ready.*reentry_request/i.test(e)));
+});
+
+test('validateHandoff: reentry_request without code_ready=false is also flagged when code_ready missing', () => {
+  const co = {
+    handoff: {
+      // code_ready omitted — falsy
+      handoff_summary: 'x',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'u1' }],
+    },
+    reentry_request: { conflict_type: 'invalid_stage_j_condition', reason: 'x' },
+  };
+  const result = validateHandoff(co, mkContext());
+  // Either "code_ready missing" or "inconsistency" is acceptable — both correct signals.
+  assert.equal(result.valid, false);
+});
+
+test('validateHandoff: no reentry_request, code_ready=false → standard invalid (existing behavior)', () => {
+  const co = {
+    handoff: {
+      code_ready: false,
+      handoff_summary: 'x',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'u1' }],
+    },
+  };
+  const result = validateHandoff(co, mkContext());
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /code_ready/i.test(e)));
+});

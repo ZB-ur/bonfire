@@ -11,7 +11,37 @@ const HANDOFF_REQUIRED_FIELDS = [
 
 function validateHandoff(compileOutput, context) {
   const errors = [];
-  if (!compileOutput || !compileOutput.handoff) {
+  if (!compileOutput || typeof compileOutput !== 'object') {
+    return { valid: false, errors: ['compile-output.json missing or not an object'] };
+  }
+
+  // reentry_request detection — takes precedence over normal handoff validation
+  if (compileOutput.reentry_request !== undefined) {
+    const req = compileOutput.reentry_request;
+    const handoff = compileOutput.handoff || {};
+    const codeReady = handoff.code_ready;
+    if (codeReady === true) {
+      errors.push(
+        'reentry_request present but handoff.code_ready=true — self-contradictory. ' +
+        'Declaring a reentry request overrides compile-ready status, but J-Compile ' +
+        'should not have produced this combination. Fix at agent level.'
+      );
+    }
+    if (codeReady === undefined) {
+      errors.push(
+        'reentry_request present but handoff.code_ready is missing. ' +
+        'When declaring a reentry, handoff.code_ready MUST be false.'
+      );
+    }
+    return {
+      valid: false,  // never valid: reentry_request means "refuse to compile", not a code-ready package
+      errors,
+      reentry_request: errors.length === 0 ? req : null,  // only surface when consistency check passed
+    };
+  }
+
+  // Standard handoff validation
+  if (!compileOutput.handoff) {
     return { valid: false, errors: ['compile-output.json missing handoff section'] };
   }
   const handoff = compileOutput.handoff;
