@@ -124,16 +124,21 @@ Legacy free-string conditions no longer validate. Every condition must now be `{
 
 This is the **substantive slot whitelist** expressed at schema level, not hardcoded in the validator. When a future slot is added to the handoff shape, the schema author must either list it here (provenance required) or consciously decide to omit it. There is no "forget to update the validator" failure mode.
 
-**J-Compile output schema extension — BLOCKED state:** When J-Compile determines during execution that an approved stage-j condition cannot be fulfilled without inventing content, it must not invent and must not produce a pass-through compile-output. Extend the compile-output schema to accept a `reentry_request` field on the top-level handoff:
+**J-Compile output schema extension — BLOCKED state:** When J-Compile determines during execution that an approved stage-j condition cannot be fulfilled without inventing content, it must not invent and must not produce a pass-through compile-output. Extend the compile-output schema to accept a `reentry_request` field at the **top level of `compile-output.json`, as a sibling of the `handoff` object** (not nested inside `handoff`):
 
 ```json
-"reentry_request": {
-  "conflict_type": "invalid_stage_j_condition",
-  "reason": "<human-readable explanation naming the specific condition index and the missing source coverage>"
+{
+  "handoff": { "code_ready": false, ... },
+  "reentry_request": {
+    "conflict_type": "invalid_stage_j_condition",
+    "reason": "<human-readable explanation naming the specific condition index and the missing source coverage>"
+  }
 }
 ```
 
-When `reentry_request` is present, `code_ready` MUST be `false`. `handoff-validate` detects this shape and emits the declared `conflict_type` to the caller without running Layer 2a/2b — the request IS the signal. This keeps validator responsibility clean: "validate a compile product that claims to be complete" vs "detect that J is refusing to complete." Explicit field, explicit semantics.
+When `reentry_request` is present, `handoff.code_ready` MUST be `false`. `handoff-validate` MUST enforce this consistency — if it sees `reentry_request` present but `handoff.code_ready === true`, emit a distinct consistency error ("reentry_request present but handoff.code_ready=true — self-contradictory output; declaring a reentry request overrides, but this must be fixed at the J-Compile agent level") rather than silently honoring the reentry request. This prevents an LLM-produced self-contradictory output from becoming an ambiguous signal.
+
+When `reentry_request` is present and `code_ready` is consistent (`false`), `handoff-validate` detects this shape and emits the declared `conflict_type` to the caller without running Layer 2a/2b — the request IS the signal. This keeps validator responsibility clean: "validate a compile product that claims to be complete" vs "detect that J is refusing to complete." Explicit field, explicit semantics.
 
 **`schemas/bonfire-v1.json#reentry_routes`** — add two routes:
 
