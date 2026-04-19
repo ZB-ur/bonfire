@@ -1,0 +1,19 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "x",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "u1" }],
+    "domain_model": {
+      "entities": {
+        "HandStrength": {
+          "fields": {},
+          "notes": "classifier implementations for priority-ordered",
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-050"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+{"type":"propose","id":"CON-010","category":"retained_goal","content":"two drill modes: preflop and postflop","source":"stage-a","rationale":"core scope","timestamp":"2026-04-18T00:00:00Z"}
+{"type":"update","id":"CON-010","field":"aligned_by","value":"stage-g-survival","timestamp":"2026-04-18T00:00:01Z"}
+{"type":"freeze","id":"CON-010","timestamp":"2026-04-18T00:00:02Z"}

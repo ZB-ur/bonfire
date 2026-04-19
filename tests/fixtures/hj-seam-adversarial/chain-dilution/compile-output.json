@@ -1,0 +1,19 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "x",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "u1" }],
+    "domain_model": {
+      "entities": {
+        "DrillMode": {
+          "fields": { "preflop": "bool", "postflop": "bool" },
+          "notes": "orthogonal drill-mode fields for preflop and postflop",
+          "source_kind": "condition_rewrite",
+          "source_ref": { "condition_index": 0 }
+        }
+      }
+    }
+  }
+}

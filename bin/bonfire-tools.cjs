@@ -61,11 +61,15 @@ function deltaValidateCommand(args) {
 function handoffValidateCommand(args) {
   const { validateHandoff } = require('./lib/schema.cjs');
   const { resolveRoot, loadJSON } = require('./lib/utils.cjs');
+  const { loadSnapshot } = require('./lib/truth-surface.cjs');
   const root = resolveRoot(process.cwd());
   if (!root) exitError('.bonfire/ not found', []);
   const co = loadJSON(path.join(root, 'plan', 'compile-output.json'));
   if (!co) exitError('compile-output.json not found', []);
-  const result = validateHandoff(co);
+  const dir = path.dirname(root);
+  const snapshot = loadSnapshot(dir) || { entries: {} };
+  const verdict = loadJSON(path.join(root, 'plan', 'h-review-verdict.json')) || null;
+  const result = validateHandoff(co, { snapshot, verdict });
   if (result.valid) exitJSON({ valid: true });
   else exitError('Handoff validation failed', result.errors);
 }
