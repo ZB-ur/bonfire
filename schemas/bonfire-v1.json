@@ -217,6 +217,15 @@
       "terminal_status": null
     }
   },
+  "handoff_substantive_slots": {
+    "handoff.domain_model.entities": { "_provenance_required": true, "kind": "per_entry" },
+    "handoff.function_contracts": { "_provenance_required": true, "kind": "per_entry", "fields": ["purpose", "invariants", "failure_modes"] },
+    "handoff.data_contract": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.panels": { "_provenance_required": true, "kind": "per_entry", "fields": ["description", "elements", "states"] },
+    "handoff.ui_contract.state_ownership": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section" }
+  },
   "delta_schemas": {
     "bonfire-d-critique": {
       "required_fields": ["agent", "challenges"],
