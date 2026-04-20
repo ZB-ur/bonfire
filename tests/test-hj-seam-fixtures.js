@@ -192,12 +192,39 @@ test('fixture: cross-language-smuggle — CJK orphans caught by Layer 2b', () =>
   }
 });
 
-test('fixture: cross-language-approved — explicit CJK condition passes', () => {
+test('fixture: cross-language-approved — Layer 2 (provenance + token coverage) accepts the slot', () => {
   const dir = makeTmpDir();
   try {
     installProvenanceFixture(dir, 'cross-language-approved');
     const result = runHandoffValidate(dir);
     assert.equal(result.code, 0, `stderr: ${result.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: cross-language-approved — KNOWN GAP F1: Layer 1 still rejects despite valid Layer 2', () => {
+  // Spec §6.4 claims a legitimate path: H-Review issues a stage-j condition whose
+  // text carries the approved CJK UI copy; the compile-output slot cites the
+  // condition as source and Layer 2b matches.
+  //
+  // In practice Layer 1 rejects the condition FIRST because its substantive tokens
+  // (panel, titled, 开始训练, 和, 重置统计) are not in the FROZEN ledger and not
+  // in the format whitelist. Real pipelines using state-advance --step stage-h
+  // will never reach Layer 2.
+  //
+  // This test pins the current (broken) behavior. When the design decision lands
+  // (flag on condition / require CJK in ledger / CJK Layer-1 exemption — see PR #2
+  // follow-up list), this assertion flips from notEqual to equal.
+  const dir = makeTmpDir();
+  try {
+    installProvenanceFixture(dir, 'cross-language-approved');
+    const result = runValidateConditions(dir);
+    assert.notEqual(
+      result.code, 0,
+      'F1 has been fixed — spec §6.4 positive path now flows through Layer 1. ' +
+      'Flip this assertion to `assert.equal(result.code, 0)` and update the fixture README.'
+    );
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
