@@ -1,0 +1,19 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "x",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "u1" }],
+    "domain_model": {
+      "entities": {
+        "BoardTexture": {
+          "fields": {},
+          "notes": "board texture classification with 10 categories",
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-014"
+        }
+      }
+    }
+  }
+}

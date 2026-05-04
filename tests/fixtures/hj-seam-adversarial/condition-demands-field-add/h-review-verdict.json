@@ -1,0 +1,7 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "x",
+  "conditions": [
+    { "text": "add a risk_level field to the scenario model", "target_stage": "stage-j" }
+  ]
+}

@@ -49,8 +49,13 @@ function checkMaturityGate(entry) {
 
   const gate = catConfig.maturity_gate;
   if (gate === 'challenged_by_non_empty') {
-    if (!entry.challenged_by || entry.challenged_by.length === 0) {
-      throw new Error(`Maturity gate failed: "${entry.category}" requires non-empty challenged_by before freeze`);
+    const challenged = Array.isArray(entry.challenged_by) && entry.challenged_by.length > 0;
+    const aligned    = Array.isArray(entry.aligned_by)    && entry.aligned_by.length    > 0;
+    if (!challenged && !aligned) {
+      throw new Error(
+        `Maturity gate failed: "${entry.category}" requires non-empty ` +
+        `challenged_by or aligned_by before freeze`
+      );
     }
   } else if (gate === 'evidence_required') {
     // confirmed_fact: evidence_refs must be non-empty OR no gate enforced here
@@ -489,4 +494,5 @@ module.exports = {
   rebuild,
   getHistoryPath,
   getSnapshotPath,
+  checkMaturityGate,  // exported so freeze-enforcement can pre-validate
 };

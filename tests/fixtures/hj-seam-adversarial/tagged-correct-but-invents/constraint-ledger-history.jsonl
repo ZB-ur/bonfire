@@ -1,0 +1,3 @@
+{"type":"propose","id":"CON-003","category":"retained_goal","content":"user can select drill mode","source":"stage-a","rationale":"core flow","timestamp":"2026-04-18T00:00:00Z"}
+{"type":"update","id":"CON-003","field":"aligned_by","value":"stage-g-survival","timestamp":"2026-04-18T00:00:01Z"}
+{"type":"freeze","id":"CON-003","timestamp":"2026-04-18T00:00:02Z"}

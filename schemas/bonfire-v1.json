@@ -169,7 +169,9 @@
     "probe_invalidated":      { "to": "stage-f", "crosses_pipeline": false },
     "adversarial_unresolved": { "to": "stage-g", "crosses_pipeline": false },
     "handoff_incomplete":     { "to": "stage-h", "crosses_pipeline": false },
-    "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false }
+    "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false },
+    "invalid_stage_j_condition":   { "to": "stage-h", "crosses_pipeline": false },
+    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false }
   },
   "categories": {
     "retained_goal": {
@@ -215,6 +217,15 @@
       "terminal_status": null
     }
   },
+  "handoff_substantive_slots": {
+    "handoff.domain_model.entities": { "_provenance_required": true, "kind": "per_entry" },
+    "handoff.function_contracts": { "_provenance_required": true, "kind": "per_entry", "fields": ["purpose", "invariants", "failure_modes"] },
+    "handoff.data_contract": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.panels": { "_provenance_required": true, "kind": "per_entry", "fields": ["description", "elements", "states"] },
+    "handoff.ui_contract.state_ownership": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section" },
+    "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section" }
+  },
   "delta_schemas": {
     "bonfire-d-critique": {
       "required_fields": ["agent", "challenges"],
@@ -236,7 +247,12 @@
       "optional_fields": ["conflict_type", "conditions", "rulings"],
       "constraints": {
         "verdict_enum": ["approved", "approved_with_conditions", "rejected"],
-        "conflict_type_required_when_rejected": true
+        "conflict_type_required_when_rejected": true,
+        "condition_item_shape": {
+          "type": "object",
+          "required_fields": ["text", "target_stage"],
+          "target_stage_enum": ["stage-j"]
+        }
       }
     },
     "bonfire-evaluator": {

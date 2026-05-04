@@ -27,6 +27,9 @@ const COMMANDS = {
   'truth-read':       () => truthCommand('read'),
   'truth-query':      () => truthCommand('query'),
   'truth-rebuild':    () => truthCommand('rebuild'),
+  'stage-g-freeze-gate': () => stageGFreezeGateCommand,
+  'apply-h-rulings':     () => applyHRulingsCommand,
+  'validate-h-conditions': () => validateHConditionsCommand,
   'delta-validate':   () => deltaValidateCommand,
   'handoff-validate': () => handoffValidateCommand,
   'bundle-validate':  () => bundleValidateCommand,
@@ -58,11 +61,15 @@ function deltaValidateCommand(args) {
 function handoffValidateCommand(args) {
   const { validateHandoff } = require('./lib/schema.cjs');
   const { resolveRoot, loadJSON } = require('./lib/utils.cjs');
+  const { loadSnapshot } = require('./lib/truth-surface.cjs');
   const root = resolveRoot(process.cwd());
   if (!root) exitError('.bonfire/ not found', []);
   const co = loadJSON(path.join(root, 'plan', 'compile-output.json'));
   if (!co) exitError('compile-output.json not found', []);
-  const result = validateHandoff(co);
+  const dir = path.dirname(root);
+  const snapshot = loadSnapshot(dir) || { entries: {} };
+  const verdict = loadJSON(path.join(root, 'plan', 'h-review-verdict.json')) || null;
+  const result = validateHandoff(co, { snapshot, verdict });
   if (result.valid) exitJSON({ valid: true });
   else exitError('Handoff validation failed', result.errors);
 }
@@ -216,6 +223,88 @@ function routeCommand(args) {
     exitError(`Unknown conflict type: ${type}`, Object.keys(schema.reentry_routes));
   }
   exitJSON(route);
+}
+
+function stageGFreezeGateCommand(args) {
+  const { stageGFreezeGate } = require('./lib/freeze-enforcement.cjs');
+  const { resolveRoot, exitJSON, exitError } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+
+  try {
+    const summary = stageGFreezeGate(dir);
+    if (summary.unresolved.length > 0) {
+      process.stderr.write(
+        `stage-g-freeze-gate: ${summary.unresolved.length} unresolved CHALLENGED entries ` +
+        `without alignment:\n`
+      );
+      for (const id of summary.unresolved) {
+        process.stderr.write(`  - ${id}\n`);
+      }
+      process.stderr.write(
+        `Return these to G-Blue for defense or escalate to H-Review.\n`
+      );
+      exitJSON(summary, 1);
+    }
+    exitJSON(summary, 0);
+  } catch (err) {
+    exitError(err.message, []);
+  }
+}
+
+function applyHRulingsCommand(args) {
+  const { applyHRulings } = require('./lib/freeze-enforcement.cjs');
+  const { resolveRoot, exitJSON, exitError } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+
+  try {
+    const result = applyHRulings(dir);
+    exitJSON(result, 0);
+  } catch (err) {
+    exitError(err.message, []);
+  }
+}
+
+function validateHConditionsCommand(args) {
+  const { validateHConditions } = require('./lib/seam-validation.cjs');
+  const { loadSnapshot } = require('./lib/truth-surface.cjs');
+  const { resolveRoot, exitJSON, exitError, loadJSON } = require('./lib/utils.cjs');
+  const root = resolveRoot(process.cwd());
+  if (!root) exitError('.bonfire/ not found', []);
+  const dir = path.dirname(root);
+
+  const verdictPath = path.join(root, 'plan', 'h-review-verdict.json');
+  let verdict;
+  try {
+    verdict = JSON.parse(require('fs').readFileSync(verdictPath, 'utf8'));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      exitError(`h-review-verdict.json not found at ${verdictPath}`, [], 3);
+    }
+    exitError(`h-review-verdict.json unreadable at ${verdictPath}: ${err.message}`, [], 3);
+  }
+
+  const snapshot = loadSnapshot(dir);
+
+  const result = validateHConditions(verdict, snapshot);
+  if (!result.valid) {
+    process.stderr.write(
+      `validate-h-conditions: ${result.violations.length} violation(s):\n`
+    );
+    for (const v of result.violations) {
+      const idx = v.index === null ? 'verdict' : `conditions[${v.index}]`;
+      process.stderr.write(`  - ${idx}: ${v.reason}\n`);
+    }
+    process.stderr.write(
+      `Return these to H-Review (re-run with these failures in agent input) ` +
+      `or reject with an appropriate conflict_type.\n`
+    );
+    exitJSON({ valid: false, violations: result.violations }, 1);
+  }
+  exitJSON({ valid: true, violations: [] }, 0);
 }
 
 function main() {

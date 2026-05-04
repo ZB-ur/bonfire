@@ -1,0 +1,9 @@
+{"type":"propose","id":"CON-002","category":"retained_goal","content":"Web application SPA","source":"stage-a","rationale":"User chose web platform","notes":null,"timestamp":"2026-04-11T17:31:57.113Z"}
+{"type":"propose","id":"CON-007","category":"retained_goal","content":"Chinese language UI","source":"stage-a","rationale":"User request","notes":null,"timestamp":"2026-04-11T17:34:32.324Z"}
+{"type":"propose","id":"CON-012","category":"frozen_constraint","content":"Tech stack React + Vite","source":"stage-c","rationale":"Retained option A","notes":null,"timestamp":"2026-04-11T17:42:21.545Z"}
+{"type":"propose","id":"ACC-001","category":"acceptance_semantic","content":"User can select drill mode","source":"stage-a","rationale":"Core flow","notes":null,"timestamp":"2026-04-11T17:38:26.112Z"}
+{"type":"propose","id":"DEP-001","category":"dependency_chain","content":"REQ-02 blocks REQ-03","source":"stage-c","rationale":"Type dependency","notes":null,"timestamp":"2026-04-11T17:42:28.786Z"}
+{"type":"propose","id":"RISK-001","category":"high_impact_risk","content":"Full GTO data infeasible","source":"stage-a","rationale":"Intractable","notes":null,"timestamp":"2026-04-11T16:07:38.674Z"}
+{"type":"propose","id":"CON-001","category":"retained_goal","content":"Preflop + simplified postflop scope","source":"stage-a","rationale":"User tradeoff","notes":null,"timestamp":"2026-04-11T17:30:48.278Z"}
+{"type":"update","id":"CON-001","field":"challenged_by","value":"d-critique","timestamp":"2026-04-11T17:44:52.000Z"}
+{"type":"freeze","id":"CON-001","timestamp":"2026-04-11T17:49:40.071Z"}

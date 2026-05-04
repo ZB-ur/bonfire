@@ -1,0 +1,7 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "format work",
+  "conditions": [
+    { "text": "handoff MUST document each board texture scenario in structured form", "target_stage": "stage-j" }
+  ]
+}

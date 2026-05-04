@@ -157,11 +157,21 @@ test('state-advance past stage-a sets approval', () => {
   fs.rmSync(dir, { recursive: true });
 });
 
+function writeEmptyHVerdict(dir) {
+  // Stage-h invariant requires verdict to exist; empty rulings → trivial pass.
+  const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+  fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+  fs.writeFileSync(verdictPath, JSON.stringify({
+    verdict: 'approved', reason: 'test', rulings: []
+  }, null, 2));
+}
+
 test('state-advance from plan last step sets pipeline_stage to code', () => {
   const dir = makeTmpDir();
   initCase(dir);
   execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { encoding: 'utf8', cwd: dir });
   execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { encoding: 'utf8', cwd: dir });
+  writeEmptyHVerdict(dir);
   const planSteps = ['stage-b', 'stage-c', 'stage-d', 'stage-e', 'stage-f', 'stage-g', 'stage-h', 'stage-j'];
   for (const step of planSteps) {
     execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { encoding: 'utf8', cwd: dir });
@@ -178,6 +188,7 @@ test('state-init-code-steps creates unit steps with pipeline code', () => {
   initCase(dir);
   execFileSync('node', [CLI, 'state-step', '--step', 'stage-a', '--status', 'passed'], { encoding: 'utf8', cwd: dir });
   execFileSync('node', [CLI, 'state-advance', '--step', 'stage-a'], { encoding: 'utf8', cwd: dir });
+  writeEmptyHVerdict(dir);
   const planSteps = ['stage-b', 'stage-c', 'stage-d', 'stage-e', 'stage-f', 'stage-g', 'stage-h', 'stage-j'];
   for (const step of planSteps) {
     execFileSync('node', [CLI, 'state-step', '--step', step, '--status', 'passed'], { encoding: 'utf8', cwd: dir });

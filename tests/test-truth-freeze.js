@@ -75,6 +75,32 @@ test('freeze succeeds for retained_goal after challenge', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test: freeze succeeds for retained_goal with only aligned_by set
+// ---------------------------------------------------------------------------
+test('freeze succeeds for retained_goal with only aligned_by set', () => {
+  const root = makeTempRoot();
+  try {
+    propose(root, {
+      id: 'rg-aligned-only',
+      category: 'retained_goal',
+      content: 'Survived adversarial review unchallenged.',
+    });
+
+    // No challenged_by — only aligned_by populated (simulating stage-g-survival
+    // or stage-h-ruling auto-alignment path).
+    update(root, { id: 'rg-aligned-only', field: 'aligned_by', value: 'stage-h-ruling' });
+
+    freeze(root, { id: 'rg-aligned-only' });
+
+    const snapshot = loadSnapshot(root);
+    assert.equal(snapshot.entries['rg-aligned-only'].status, 'FROZEN');
+    assert.deepEqual(snapshot.entries['rg-aligned-only'].aligned_by, ['stage-h-ruling']);
+  } finally {
+    fs.rmSync(root, { recursive: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Test 3: freeze confirmed_fact without challenged_by succeeds
 // ---------------------------------------------------------------------------
 test('freeze confirmed_fact without challenged_by succeeds', () => {

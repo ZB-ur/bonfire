@@ -1,0 +1,5 @@
+{"type":"propose","id":"CON-014","category":"frozen_constraint","content":"board texture classification","source":"stage-c","rationale":"r","timestamp":"2026-04-18T00:00:00Z"}
+{"type":"update","id":"CON-014","field":"challenged_by","value":"d-critique","timestamp":"2026-04-18T00:00:01Z"}
+{"type":"update","id":"CON-014","field":"aligned_by","value":"g-blue","timestamp":"2026-04-18T00:00:02Z"}
+{"type":"freeze","id":"CON-014","timestamp":"2026-04-18T00:00:03Z"}
+{"type":"supersede","id":"CON-014b","supersedes":"CON-014","category":"frozen_constraint","content":"board texture classification 10 exact categories","source":"h-review","rationale":"H-Review ruling","timestamp":"2026-04-18T00:00:04Z"}

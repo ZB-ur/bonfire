@@ -1,0 +1,7 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "format",
+  "conditions": [
+    { "text": "rewrite CON-010 into orthogonal drill-mode fields", "target_stage": "stage-j" }
+  ]
+}

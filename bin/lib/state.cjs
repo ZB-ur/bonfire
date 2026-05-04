@@ -67,6 +67,130 @@ function initPipelineSteps(schema, pipelineStage) {
   return steps;
 }
 
+// ─── Invariant gates ─────────────────────────────────────────────────────────
+
+function checkStageGInvariant() {
+  const { loadSnapshot } = require('./truth-surface.cjs');
+  const root = getRoot();
+  const dir = path.dirname(root);
+  const snapshot = loadSnapshot(dir);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  // Categories that cannot be frozen (can_freeze: false in schema) are expected
+  // to remain in their terminal-per-category status and must not block advance.
+  // Today this covers: high_impact_risk (OPEN), challenged_claim (CHALLENGED),
+  // discarded_option (DISCARDED).
+  const schema = getSchema();
+  const noFreezeCategories = new Set(
+    Object.entries(schema.categories || {})
+      .filter(([_, cfg]) => cfg && cfg.can_freeze === false)
+      .map(([name]) => name)
+  );
+
+  const unresolved = [];
+  for (const [id, entry] of Object.entries(entries)) {
+    if (noFreezeCategories.has(entry.category)) continue;
+    if (entry.status === 'PROPOSED' || entry.status === 'CHALLENGED') {
+      unresolved.push(id);
+    }
+  }
+
+  if (unresolved.length > 0) {
+    process.stderr.write(
+      `Cannot advance from stage-g: ${unresolved.length} entries still unresolved:\n`
+    );
+    for (const id of unresolved) {
+      process.stderr.write(`  - ${id}\n`);
+    }
+    process.stderr.write(`Run: bonfire stage-g-freeze-gate\n`);
+    process.exit(1);
+  }
+}
+
+function checkStageHInvariant() {
+  const { loadSnapshot } = require('./truth-surface.cjs');
+  const { validateDelta } = require('./delta-parser.cjs');
+  const { validateHConditions } = require('./seam-validation.cjs');
+  const root = getRoot();
+  const dir = path.dirname(root);
+  const verdictPath = path.join(root, 'plan', 'h-review-verdict.json');
+
+  let verdict;
+  try {
+    verdict = JSON.parse(fs.readFileSync(verdictPath, 'utf8'));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      exitError(`h-review-verdict.json not found at ${verdictPath}`, [], 3);
+    }
+    exitError(`h-review-verdict.json unreadable at ${verdictPath}: ${err.message}`, [], 3);
+  }
+
+  const validation = validateDelta('bonfire-h-review', verdict);
+  if (!validation.valid) {
+    exitError(
+      `h-review-verdict.json failed schema validation: ${validation.errors.join('; ')}`,
+      [],
+      3
+    );
+  }
+
+  // Load snapshot once — reused by Layer 1 below and the rulings check.
+  const snapshot = loadSnapshot(dir);
+  const entries = (snapshot && snapshot.entries) || {};
+
+  // Layer 1: condition-text invariants (blacklisted verbs, paraphrase patterns,
+  // orphan tokens). Runs after schema validation, before rulings invariant.
+  const condResult = validateHConditions(verdict, snapshot);
+  if (!condResult.valid) {
+    process.stderr.write(
+      `Cannot advance from stage-h: ${condResult.violations.length} condition violation(s):\n`
+    );
+    for (const v of condResult.violations) {
+      const idx = v.index === null ? 'verdict' : `conditions[${v.index}]`;
+      process.stderr.write(`  - ${idx}: ${v.reason}\n`);
+    }
+    process.stderr.write(
+      `Run: bonfire state-reentry --conflict-type invalid_stage_j_condition\n`
+    );
+    process.exit(1);
+  }
+
+  const rulings = Array.isArray(verdict.rulings) ? verdict.rulings : [];
+  const filtered = rulings.filter(r => r.action === 'freeze' || r.action === 'supersede');
+  if (filtered.length === 0) return;  // trivial pass
+
+  const failures = [];
+  for (const ruling of filtered) {
+    if (ruling.action === 'freeze') {
+      const actual = entries[ruling.id] && entries[ruling.id].status;
+      if (actual !== 'FROZEN') {
+        failures.push(`  - freeze(id=${ruling.id}) expected=FROZEN actual=${actual || '<missing>'}`);
+      }
+    } else if (ruling.action === 'supersede') {
+      const oldStatus = entries[ruling.supersedes] && entries[ruling.supersedes].status;
+      const newStatus = entries[ruling.id] && entries[ruling.id].status;
+      const oldOk = oldStatus === 'SUPERSEDED';
+      const newOk = newStatus === 'FROZEN';
+      if (!oldOk || !newOk) {
+        failures.push(
+          `  - supersede(supersedes=${ruling.supersedes}, id=${ruling.id}) ` +
+          `expected: ${ruling.supersedes}=SUPERSEDED, ${ruling.id}=FROZEN; ` +
+          `actual: ${ruling.supersedes}=${oldStatus || '<missing>'}, ${ruling.id}=${newStatus || '<missing>'}`
+        );
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    process.stderr.write(
+      `Cannot advance from stage-h: ${failures.length} rulings not satisfied:\n`
+    );
+    process.stderr.write(failures.join('\n') + '\n');
+    process.stderr.write(`Run: bonfire apply-h-rulings\n`);
+    process.exit(1);
+  }
+}
+
 // ─── Exported command handlers ────────────────────────────────────────────────
 
 function stateRead(args) {
@@ -123,6 +247,13 @@ function stateAdvance(args) {
 
   if (!stepName) {
     exitError('Usage: state-advance --step <name>', [], 2);
+  }
+
+  // Invariant gates: refuse to advance when ledger state violates contract.
+  if (stepName === 'stage-g') {
+    checkStageGInvariant();
+  } else if (stepName === 'stage-h') {
+    checkStageHInvariant();
   }
 
   const schema = getSchema();

@@ -1,0 +1,7 @@
+{
+  "verdict": "approved_with_conditions",
+  "reason": "Chinese UI copy approved",
+  "conditions": [
+    { "text": "panel titled 开始训练 和 重置统计", "target_stage": "stage-j" }
+  ]
+}
