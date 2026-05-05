@@ -95,3 +95,23 @@ This is a living document, NOT a frozen spec. Append items as discovered. When A
 **Estimated effort:** M
 **Dependencies:** ASSERTION-4 close (so flat-CON behavior is observed in production for ≥1 dogfood cycle before cascade)
 **Notes:** ASSERTION-4 spec adds `prefix is recommendation only; tooling assumes flat numbering for auto-id` footnote. B007 is the question of whether to also retire the recommendation entirely. Two sub-options: (X) keep prefix recommendation in references/categories.md but mark as informational-only; (Y) sweep-remove all prefix-aware code and docs. Prefer (X) — prefix carries cognitive value for human readers even if tooling ignores it.
+
+### B008 — Migrate _provenance_required out of schema per §6.0 boundary rule
+
+**Source:** ASSERTION-4 spec §6.0 dialectic round 2
+**Discovered:** 2026-05-06
+**Kind:** capability
+**Why deferred:** ASSERTION-4 §6.0 declares that schema declares parameters and validator code owns rule shape. PR #2's `_provenance_required` annotation is borderline DSL (a marker key in schema influencing validator behavior) and predates that rule. ASSERTION-4 grandfathers it explicitly to avoid scope creep. B008 is the eventual cleanup.
+**Estimated effort:** S
+**Dependencies:** ASSERTION-4 close (so the §6.0 rule has lived for ≥1 cycle and §6.1's pure-parameter form is the current example)
+**Notes:** Refactor target: move `_provenance_required: true` and the `kind` / `fields` per-slot annotations out of `schemas/bonfire-v1.json::handoff_substantive_slots` into `bin/lib/schema.cjs` as a code-level constant. Schema retains only the slot path list (parameter form). validator code owns "this slot needs provenance + walks these fields" (rule form). Keeps governance consistent across PR #2 and ASSERTION-4 work.
+
+### B009 — Per-conflict retry budget independence from global max_depth (advanced reentry model)
+
+**Source:** ASSERTION-4 spec §4.4.1 dialectic round 2
+**Discovered:** 2026-05-06
+**Kind:** design
+**Why deferred:** ASSERTION-4 introduces per-conflict `retry_budget` but constrains it within global `max_depth` per §4.4.1. Making per-conflict budget independent (so mandate_failure can have a true budget of 2 regardless of other conflict types' depth consumption) requires redesigning the depth model — separate counters per conflict_type, or budget-aware max_depth raise.
+**Estimated effort:** M
+**Dependencies:** ASSERTION-4 close + B002 (per-route reset granularity; B009 is complementary axis on same reentry-routing surface)
+**Notes:** Possible designs: (1) replace global max_depth with per-conflict depth tracking; (2) retain global max_depth but make it auto-raise when per-conflict budgets sum to a higher value; (3) cap chain (e.g., `max_total_depth` AND per-conflict budgets coexist as separate caps). Decision depends on dogfood evidence about whether mandate_failure retry frequency is actually constrained by max_depth in practice. ASSERTION-4 §10.3 records this as a known limitation.

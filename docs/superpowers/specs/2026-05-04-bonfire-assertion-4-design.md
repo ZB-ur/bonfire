@@ -109,9 +109,32 @@ Rationale for 5th percentile: accepts ~5% legit-FP risk in exchange for outlier 
 
 Rationale for ≥ 6 sample minimum: dogfood produced 0 populated slots (minimal handoff); calibration MUST coerce J to produce ≥6 to give the percentile statistical meaning. If j-compile produces fewer, calibration fails kill-criterion (re-dispatch with stricter "produce ≥6 slots" guidance, or escalate).
 
-#### §3.3.2 — Outlier exclusion (transitive paraphrase)
+#### §3.3.2 — Outlier exclusion (transitive paraphrase) — hybrid enumeration with halt-on-unknown
 
-Slots whose source ledger entry has an `aligned_by` token of form `stage-*-superseded-by-*` or `stage-*-mitigated-via-*` (i.e., the source is itself a paraphrase-resolution forward-port of an earlier idea) are EXCLUDED from anchor computation. Reason: measuring overlap of slot vs paraphrased-source double-counts paraphrase distance.
+Slots whose source ledger entry has certain `aligned_by` token shapes are EXCLUDED from anchor computation. Reason: measuring overlap of slot vs paraphrased-source double-counts paraphrase distance.
+
+**Classification rule (binding):**
+
+```
+EXCLUDE  if any aligned_by token matches /^stage-.*-(superseded-by|mitigated-via)-/
+INCLUDE  if all aligned_by tokens are in {"stage-g-survival", "stage-h-ruling"}
+INCLUDE  if aligned_by is null, undefined, or empty array
+HALT-AND-CLASSIFY  if any aligned_by token does not fall in EXCLUDE or INCLUDE sets
+```
+
+Rationale: positive enumeration (EXCLUDE list only) misses new paraphrase markers introduced after spec freeze (silent inclusion → anchor too low). Negative enumeration (INCLUDE list only) misses new freeze markers (silent exclusion → sample too small). Hybrid + halt forces operator to classify novel values, never silently absorbs them.
+
+**Plan responsibility (preemptive, before calibration dispatch):**
+
+Plan calibration sub-task MUST start with:
+
+1. `grep` all `aligned_by` value emit points across `bin/lib/truth-surface.cjs`, `bin/lib/freeze-enforcement.cjs`, `bin/lib/schema.cjs`, `agents/*.md`, `skills/*/SKILL.md`, and any code path that calls `truth-update --field aligned_by`.
+2. Collect every distinct emitted value (literal strings, format-string templates, dynamically-constructed values).
+3. Classify each into EXCLUDE / INCLUDE per the rule above.
+4. If any value is unclassified by the spec rule, plan HALTS — operator must explicitly classify the novel value, record the decision in calibration log, and if EXCLUDE additions are warranted, trigger errata to update §3.3.2 list.
+5. Only after every emit point is classified, run the calibration dispatch.
+
+This makes the halt **preemptive** (during plan setup) rather than **reactive** (during data processing). Calibration data flow stays uninterrupted; novel-marker decisions are pushed up to the human at the planning stage where they belong.
 
 After exclusion, if remaining sample size < 6, calibration fails (same handling as §3.3.1 minimum violation).
 
@@ -203,11 +226,27 @@ mandate_failure is structurally J-fixable when the input ledger is intact. J has
 
 The reentry routes table gains a new optional field `retry_budget: number | null`. Default `null` = unlimited (current behavior; PR #2 unchanged). For `mandate_failure`: `retry_budget: 2`.
 
-When state-reentry is invoked with conflict_type that has a retry budget, the validator checks current depth (already tracked as `reentry_request.depth`):
-- depth ≤ retry_budget → reset target stage to "running" status, accept reentry
-- depth > retry_budget → fall through to escalation_target_stage (defaults to `stage-h` if not specified)
+The retry_budget is **per-conflict-type**, not global. The counter is computed from the reentry history filtered by conflict_type (NOT from the global `reentry_request.depth` field, which counts all reentries together):
+
+```
+budget_used := count(state.reentry.history, h => h.conflict_type === <X>)
+budget_used <= retry_budget → accept reentry, reset target stage to "running"
+budget_used >  retry_budget → fall through to escalation_target_stage (default: stage-h)
+```
 
 This introduces "per-conflict-type retry budget" as a new primitive. ASSERTION-5 may extend it to other conflict_types (B002 currently scoped to per-route reset granularity; budget is a complementary axis).
+
+#### §4.4.1 — Budget interaction with global max_depth
+
+PR #2 enforces a global `max_depth = 2` on reentry chains regardless of conflict_type. ASSERTION-4's per-conflict `retry_budget` operates **within** that ceiling, not independently. Concrete order:
+
+1. **Hard stop first**: if global reentry depth would exceed `max_depth`, halt — no further reentry permitted regardless of per-conflict budget. Operator must intervene.
+2. **Per-conflict budget second**: within the global ceiling, per-conflict `retry_budget` further constrains how many reentries of a specific conflict_type can occur.
+3. **First violator wins**: whichever cap (global or per-conflict) is hit first triggers the corresponding behavior. Global hit → halt. Per-conflict hit → escalation_target_stage (e.g., stage-h).
+
+This means: in the worst case, mandate_failure can consume up to 2 reentries (its budget), but ONLY if no other conflict_type has consumed reentry depth first. A run that has already used 1 reentry on `handoff_provenance_failure` has only 1 remaining mandate_failure budget effectively, regardless of `retry_budget: 2`.
+
+Making per-conflict budget independent of global max_depth would require a redesign of the depth model (separate counters per conflict_type, or budget-aware max_depth raise). That redesign is **out of ASSERTION-4 scope** and tracked in `ASSERTION-5-backlog.md` B002 (which already owns reentry routing refinements).
 
 **Logging requirement:** each retry attempt under retry_budget MUST emit a `log-agent` event recording (a) attempt number, (b) which substantive_slot_refs J reported, (c) what the validator rejected. This creates an audit trail for the "is J actually self-fixing or just looping?" question.
 
@@ -270,6 +309,10 @@ For unwanted entries: use truth-discard then truth-propose the replacement.
 - ✗ Forbidden in schema: disjunctions, conjunctions, conditional logic, "this means call function X", marker keys like `_layer_m: true` that influence validator behavior
 
 If a future spec wants to express "rule X applies to slot Y only if condition Z", that logic lives in `bin/lib/schema.cjs` (or `seam-validation.cjs`), not in `bonfire-v1.json`.
+
+**Refinement of the boundary (added during dialectic round 2):** the schema-declares-parameters rule applies **within a given dispatch mode**. It does NOT cover dispatch-mode selection itself. For example, "concrete ref resolves via regex pattern OR via container-lookup with name-equality" is dispatch-mode selection — that lives in code, not in schema. Within each mode, schema may declare its parameters (regex strings for regex mode; container path + match field names for lookup mode). This refinement keeps §6.1's `concrete_ref_patterns` (regex-only) consistent with the entity-name lookup path which lives in `bin/lib/schema.cjs`.
+
+**Grandfather note:** PR #2's `_provenance_required` annotation predates this rule. It is grandfathered for ASSERTION-4 — not endorsed. Migration tracked as `ASSERTION-5-backlog.md` B008. Future schema additions follow §6.0 strictly.
 
 ### §6.1 — `schemas/bonfire-v1.json` additions
 
@@ -370,7 +413,7 @@ Options that were considered and rejected during brainstorm — these MUST NOT b
 
 2. **Layer M (M.2) escape valve abuse**. A J agent could write `no_substantive_contract: true` with a reason that references an unrelated FROZEN entry to satisfy zero-orphan against the cited entry. Mitigation: zero-orphan against cited entry text means reason prose must literally repeat the entry's content tokens — abuse requires the J agent to literally retype the cited entry. Realistically possible but high-friction. Plan dialectic may weigh adding a `_min_reason_token_count: N` constraint if this is exercised by a fixture.
 
-3. **mandate_failure retry-budget mechanism** is a new concept introduced by this spec. Risks: (a) budget exhaustion logging may mask repeated J failures of same shape if log analysis is not added; (b) per-conflict-type budget creates a heterogeneous routes table that future routes will need to decide budget for. Mitigation: §4.4 logging requirement creates audit trail; default `retry_budget: null` preserves PR #2 behavior for existing routes.
+3. **mandate_failure retry-budget mechanism** is a new concept introduced by this spec. Risks: (a) budget exhaustion logging may mask repeated J failures of same shape if log analysis is not added; (b) per-conflict-type budget creates a heterogeneous routes table that future routes will need to decide budget for; (c) per-conflict budget operates within global max_depth ceiling per §4.4.1, so the effective budget may be smaller than `retry_budget: 2` if other conflict types consumed depth first — making per-conflict budget independent requires depth-model redesign and is deferred to ASSERTION-5 B002. Mitigation: §4.4 logging requirement creates audit trail; default `retry_budget: null` preserves PR #2 behavior for existing routes; §4.4.1 explicitly declares the cap interaction so plan/code does not assume independence.
 
 4. **A1 regex passthrough false positives**. The pattern `/^con-\d+$/i` matches any token of that shape, including (theoretically) prose token sequences that happen to look like CON-NNN. Mitigation: regex is anchored start-to-end; whole-token match only; token boundary set by existing extractSubstantiveTokens whitespace+punctuation rules. §3.1.1 contract test guards the tokenizer behavior.
 
