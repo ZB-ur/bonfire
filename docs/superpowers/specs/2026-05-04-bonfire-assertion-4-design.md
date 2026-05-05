@@ -3,6 +3,7 @@ title: ASSERTION-4 — Layer 2b Softening + Layer M Mandate
 charter: 2026-05-04-bonfire-maturity-assessment.md (rows #1, #2, #4, #5, #8)
 errata: 2026-05-04-bonfire-maturity-assessment-errata.md
 followup_routing: ASSERTION-5-backlog.md (B001–B007)
+freeze_status: "frozen-with-bounded-calibration — THRESHOLD value is calibrated during plan (§3.3) within bounds defined by §3.2 + fixture lattice §7. §3.2 kill criterion triggers errata + maturity-assessment v2 + spec re-cut. The spec is frozen; only the calibrated parameter inside it is open."
 purpose: Close two orthogonal seam-validation gaps surfaced by 2026-05-04 dogfood — Layer 2b false-positive rate on legitimate handoff prose (anti-invention over-strictness) and substantive-slot vacuous-pass loophole (anti-omission absence).
 ---
 
@@ -36,9 +37,25 @@ Future anti-invention layers reserve Layer 2c, 2d, etc. Future mandate refinemen
 
 ### §3.1 — A1: CON cross-reference passthrough
 
-In `bin/lib/seam-validation.cjs::extractSubstantiveTokens` (or its consumer in `compareTokens`), tokens matching pattern `/^con-\d+$/i` are treated as scaffolding, not as substantive content. They count toward neither the source-set nor the orphan-set.
+In `bin/lib/seam-validation.cjs::compareTokens` (consumer of extractSubstantiveTokens output), tokens matching pattern `/^con-\d+$/i` are treated as scaffolding, not as substantive content. They count toward neither the source-set nor the orphan-set.
 
 Justification: `CON-026` appearing in a J slot description as a cross-reference to a related ledger entry is meta-text, not invented product semantics. The dogfood produced ~50 such orphans alone.
+
+#### §3.1.1 — Tokenization contract (load-bearing for A1)
+
+A1 depends on `extractSubstantiveTokens` producing `con-026` as an atomic single token, not splitting on the hyphen. As of this spec's freeze date, the implementation already satisfies this:
+
+- `boundaryRegex = /[\s.,;:!?()\[\]{}"'`]/` excludes hyphen
+- `lemmatizeToken` line `if (/-\d/.test(token)) return token` preserves identifier tokens
+
+These two facts are now an explicit **contract** that ASSERTION-4's A1 relies on. Plan MUST add a regression test asserting:
+
+```js
+extractSubstantiveTokens('CON-026 is foo. con-099, RG-014!') 
+  // returns exactly ['con-026', 'is', 'foo', 'con-099', 'rg-014']
+```
+
+If a future spec needs to add hyphen to boundary characters or remove the identifier preservation in lemmatization, A1's behavior breaks silently. The regression test is the canary.
 
 ### §3.2 — A3: Ratio threshold replacing zero-orphan rule
 
@@ -58,11 +75,52 @@ valid := overlap_ratio >= THRESHOLD
 
 If the empirical legitimate-paraphrase anchor turns out to be ≤ 36% (i.e., legit prose overlaps less than tagged-correct-but-invents), the threshold range becomes empty — **this is a kill criterion** for the A3 approach. In that case, plan must escalate (re-charter via maturity-assessment errata, or shift to a different option from rows #1's A2/A4).
 
+Additional **gap-width guard**: even if the range is non-empty, if `(legitimate-paraphrase-anchor - 36%) < 10 percentage points`, the range is too narrow for a defensible threshold pick. Treat as a soft-kill: plan must explicitly request operator decision (proceed with hairline THRESHOLD, or escalate to errata). Do NOT silently accept a hairline.
+
+#### §3.2.5 — Threshold offset policy
+
+Within the valid range `[lower, upper]` defined above, THRESHOLD is set as:
+
+```
+THRESHOLD = lower + ε    (ε small, e.g. 1 percentage point)
+```
+
+This is **lower-biased**: positions THRESHOLD as close as defensible to the must-fail boundary, sacrificing a small permissive cushion to maintain anti-invention pressure.
+
+Rationale: ASSERTION-4's purpose is closing two anti-X gaps simultaneously (anti-invention false-positive softening + anti-omission mandate addition). Choosing a generous middle or upper-biased threshold would re-import false-negative risk at the moment we are tightening up the omission boundary. The whole charter is "make the system harder for J to evade detection"; threshold offset must reflect that orientation.
+
+Operator override: plan may pick mid-bias `(lower + upper) / 2` OR upper-bias `upper - ε` ONLY with explicit rationale recorded in plan calibration log. Default is lower-bias.
+
 ### §3.3 — Calibration step (during plan, not code)
 
-Plan must include a calibration sub-task: dispatch a single j-compile on the gto-trainer dogfood case (`/Users/lddmay/AiCoding/bonfire-test/gto-trainer/`), instructing the agent to write "natural paraphrase, not literal quote", capture each populated substantive slot's overlap ratio against its source ledger entry under the new A1 rule (CON-* passthrough applied), record the distribution. The highest-frequency-cluster overlap ratio becomes fixture #5's anchor and informs the THRESHOLD choice.
+Plan must include a calibration sub-task: dispatch a single j-compile on the gto-trainer dogfood case (`/Users/lddmay/AiCoding/bonfire-test/gto-trainer/`), instructing the agent to write "natural paraphrase, not literal quote". Capture each populated substantive slot's overlap ratio against its source ledger entry **under the new A1 rule (CON-* passthrough applied)**.
 
-This step is documented as part of the plan's calibration work, not deferred. If it fails (j-compile cannot produce natural paraphrase, OR the overlap distribution is degenerate), the spec's A3 commitment is at risk and plan must escalate before proceeding.
+#### §3.3.1 — Statistical form (binding)
+
+The calibration anchor is computed as follows (this is the spec's commitment, not plan's discretion):
+
+```
+ANCHOR = 5th percentile of populated-slot overlap ratios
+         after A1 mask is applied,
+         computed over a calibration dispatch producing ≥ 6 populated substantive slots.
+```
+
+Rationale for 5th percentile: accepts ~5% legit-FP risk in exchange for outlier robustness. min() would let a single low-overlap slot pin the anchor unrealistically low; mode/median would let easy slots dominate; 25th percentile would accept too much FP. 5th is a defensible middle ground that prioritizes anchor stability.
+
+Rationale for ≥ 6 sample minimum: dogfood produced 0 populated slots (minimal handoff); calibration MUST coerce J to produce ≥6 to give the percentile statistical meaning. If j-compile produces fewer, calibration fails kill-criterion (re-dispatch with stricter "produce ≥6 slots" guidance, or escalate).
+
+#### §3.3.2 — Outlier exclusion (transitive paraphrase)
+
+Slots whose source ledger entry has an `aligned_by` token of form `stage-*-superseded-by-*` or `stage-*-mitigated-via-*` (i.e., the source is itself a paraphrase-resolution forward-port of an earlier idea) are EXCLUDED from anchor computation. Reason: measuring overlap of slot vs paraphrased-source double-counts paraphrase distance.
+
+After exclusion, if remaining sample size < 6, calibration fails (same handling as §3.3.1 minimum violation).
+
+#### §3.3.3 — Failure paths
+
+- **j-compile cannot produce natural paraphrase** (e.g., responds with literal quotes despite prompting): re-dispatch with stricter natural-paraphrase guidance once. If second attempt also fails, plan escalates to errata + maturity-assessment v2.
+- **Sample size < 6 after outlier exclusion**: calibration kill criterion met (same handling).
+- **5th percentile of remaining slots ≤ 36%**: calibration kill criterion met.
+- **Gap width < 10pp** per §3.2 guard: soft-kill, operator decision required.
 
 ## §4 — Axis (b): Layer M mandate
 
@@ -79,7 +137,12 @@ Each `handoff.implementation_units[N]` gets a new field:
 }
 ```
 
-`substantive_slot_refs` is `string[]`. Default `[]`. Each entry MUST be the `id` of an entry that exists in one of the populated `handoff.{domain_model.entities, function_contracts, data_contract, ui_contract.panels}` arrays/objects.
+`substantive_slot_refs` is `string[]`. Default `[]`. Two ref kinds:
+
+- **Concrete refs** (slot ids): `FC-NNN`, `panel:<id>`, or an entity name. These resolve to a populated slot in `handoff.{domain_model.entities, function_contracts, data_contract, ui_contract.panels}`.
+- **Supplementary refs** (ledger entry ids): `CON-NNN`, `RG-NNN`, etc. These are cross-references to ledger entries; used for traceability annotation but do not by themselves satisfy the "this unit implements substantive content" claim.
+
+**Per-unit invariant (NEW)**: when a unit declares non-empty `substantive_slot_refs`, the array MUST contain ≥ 1 concrete ref. Supplementary refs alone are not sufficient. This prevents a unit declaring `["CON-026"]` and resolving to CON-026 cited inside another unit's slot (loose traceability bypass).
 
 ### §4.2 — Handoff-level invariant
 
@@ -94,13 +157,19 @@ INVARIANT M (must satisfy ONE):
   
   (M.2)  handoff.no_substantive_contract === true
          AND handoff.no_substantive_contract_reason is a non-empty string
-         AND no_substantive_contract_reason contains a token matching /CON-\d+|RG-\d+|FC-\d+|AS-\d+|REQ-\d+/
-            (i.e., references at least one ledger entry id)
-         AND no_substantive_contract_reason passes Layer 2b token-coverage
-            against the FIRST referenced ledger entry (using same THRESHOLD as §3.2)
+         AND no_substantive_contract_reason contains AT LEAST ONE token
+            matching pattern /(?:CON|RG|FC|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\d+/
+            (i.e., at least one literal ledger entry id reference)
+         AND no_substantive_contract_reason passes ZERO-ORPHAN token coverage
+            (NOT the §3.2 ratio rule) against the FIRST referenced ledger entry,
+            EXCLUDING the literal id token itself from the orphan check
 ```
 
-(M.2) is the legitimate escape valve for non-typical artifacts (e.g., `probe.sh` is a single shell script with no contract surface). Its dual constraints (must reference + must pass token coverage) prevent it from becoming a free pass.
+**Why zero-orphan instead of THRESHOLD ratio for M.2:** the M.2 reason field is short (~1-3 sentences) and serves a different rhetorical purpose than substantive slot prose. Slot prose is "what will be delivered" — paraphrase is natural. M.2 reason is "why I won't deliver substantive content" — an exception form that should be a literal restatement of the cited ledger entry's relevant claim, not a paraphrase. Different genre, different rule. Mixing the two under a shared THRESHOLD is a category error.
+
+The literal id token is excluded from orphan check because it's a structural reference (the very thing we required), not content.
+
+(M.2) is the legitimate escape valve for non-typical artifacts (e.g., `probe.sh` is a single shell script with no contract surface). Its constraints (must reference + must pass strict zero-orphan against cited entry) prevent it from becoming a free pass.
 
 ### §4.3 — Per-ref resolution
 
@@ -112,13 +181,35 @@ For every unit's `substantive_slot_refs[i]`, the validator dereferences to a pop
 
 Resolution failure → Layer M fail with specific orphan ref id.
 
-### §4.4 — Reentry route
+### §4.4 — Reentry route (retry-bounded)
 
-New conflict_type: `mandate_failure` → `target_stage: stage-h`.
+New conflict_type: `mandate_failure`. Routing is **retry-bounded** (new concept introduced by this spec):
 
-Same routing as `handoff_provenance_failure` (PR #2): J cannot self-fix mandate failure because the missing content is product-semantic; H must reformulate verdict (issue conditions, or revise approval semantic).
+```
+mandate_failure → stage-j (retry budget = 2)
+                  if reentry depth for this conflict_type exceeds 2 → stage-h (escalation)
+```
 
-(Open question for ASSERTION-5: should `mandate_failure` ever route back to stage-j? Deferred — same simplification PR #2 made for handoff_provenance_failure.)
+**Rationale (departing from PR #2's handoff_provenance_failure → stage-h precedent):**
+
+mandate_failure is structurally J-fixable when the input ledger is intact. J has the FROZEN snapshot; the missing content is "fill substantive slots referencing ledger entries that already exist". Routing directly to stage-h would be theatrical — H has nothing to reformulate; the verdict is correct, J just under-delivered.
+
+| Conflict type | J self-fixable? | Routing |
+|---|---|---|
+| `handoff_provenance_failure` | Sometimes (if J added invention vs H injected it) | stage-h (PR #2 simplification debt; B002 backlog owns refinement) |
+| `mandate_failure` (NEW) | Yes (J reads ledger, fills slots) | stage-j retry-bounded; stage-h on exhaustion |
+
+**Retry budget mechanics:**
+
+The reentry routes table gains a new optional field `retry_budget: number | null`. Default `null` = unlimited (current behavior; PR #2 unchanged). For `mandate_failure`: `retry_budget: 2`.
+
+When state-reentry is invoked with conflict_type that has a retry budget, the validator checks current depth (already tracked as `reentry_request.depth`):
+- depth ≤ retry_budget → reset target stage to "running" status, accept reentry
+- depth > retry_budget → fall through to escalation_target_stage (defaults to `stage-h` if not specified)
+
+This introduces "per-conflict-type retry budget" as a new primitive. ASSERTION-5 may extend it to other conflict_types (B002 currently scoped to per-route reset granularity; budget is a complementary axis).
+
+**Logging requirement:** each retry attempt under retry_budget MUST emit a `log-agent` event recording (a) attempt number, (b) which substantive_slot_refs J reported, (c) what the validator rejected. This creates an audit trail for the "is J actually self-fixing or just looping?" question.
 
 ## §5 — Mechanical riders
 
@@ -171,24 +262,47 @@ For unwanted entries: use truth-discard then truth-propose the replacement.
 
 ## §6 — Schema deltas
 
-`schemas/bonfire-v1.json` additions only (no removals, no field renames):
+### §6.0 — Boundary rule (declared explicitly to prevent DSL slippage)
+
+**Schema declares parameters; validator code owns rule shape.** PR #2's `_provenance_required` annotation is borderline DSL — ASSERTION-4 must NOT extend that pattern. Specifically:
+
+- ✓ Allowed in schema: field names, regex patterns, enum lists, numeric thresholds, boolean flags
+- ✗ Forbidden in schema: disjunctions, conjunctions, conditional logic, "this means call function X", marker keys like `_layer_m: true` that influence validator behavior
+
+If a future spec wants to express "rule X applies to slot Y only if condition Z", that logic lives in `bin/lib/schema.cjs` (or `seam-validation.cjs`), not in `bonfire-v1.json`.
+
+### §6.1 — `schemas/bonfire-v1.json` additions
+
+Additions only (no removals, no field renames). Strictly parameter-shaped per §6.0:
 
 1. `delta_schemas.bonfire-h-review.constraints.ruling_action_enum: ["freeze", "supersede"]`
-2. `handoff_substantive_slots` unchanged (the new `substantive_slot_refs` field is on `implementation_units`, not on substantive slots themselves)
-3. New `handoff_mandate_invariant` block:
+2. `handoff_substantive_slots` unchanged.
+3. New `handoff_mandate_params` block (PARAMETERS only — rule logic lives in `validateMandate`):
    ```json
-   "handoff_mandate_invariant": {
-     "_layer_m": true,
+   "handoff_mandate_params": {
      "ref_field": "substantive_slot_refs",
+     "concrete_ref_patterns": [
+       "^FC-\\d+$",
+       "^panel:.+$"
+     ],
+     "supplementary_ref_pattern": "^(?:CON|RG|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+$",
      "escape_valve": {
        "flag": "no_substantive_contract",
        "reason_field": "no_substantive_contract_reason",
-       "reason_must_reference_ledger": true,
-       "reason_must_pass_token_coverage": true
+       "reason_ref_pattern": "(?:CON|RG|FC|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
+       "reason_uses_zero_orphan": true
      }
    }
    ```
-4. New reentry route: `mandate_failure → stage-h`
+   (Note: entity-name concrete refs are validated by string-equality lookup in `handoff.domain_model.entities[].name`, not by regex pattern. That's why `concrete_ref_patterns` lists only FC and panel formats.)
+4. New reentry route entry: `mandate_failure` with `retry_budget: 2`, `escalation_target_stage: "stage-h"`.
+
+Rule logic placement:
+- §4.2 disjunction (M.1 OR M.2) → `bin/lib/schema.cjs::validateMandate`
+- §3.1.1 tokenization contract regression → `tests/test-tokenization-contract.js`
+- Retry-budget mechanics → `bin/bonfire-tools.cjs` state-reentry handler
+
+### §6.2 — Bundle version
 
 `bundle_version` does NOT bump. Per F1, existing compile-output.json files (e.g., gto-trainer dogfood archive) are intended to fail validation under the new rules. Documented in commit message.
 
@@ -210,11 +324,26 @@ Anchors collectively pin THRESHOLD between `tagged-correct-but-invents`'s 36% (m
 
 Fixture #5 content is produced during plan calibration (§3.3) and is the empirical anchor for THRESHOLD selection.
 
-## §8 — Backward compatibility (F1)
+## §8 — Backward compatibility (F1) — affected stage products
 
-Existing `compile-output.json` files produced by pre-ASSERTION-4 J-compile runs will fail Layer M validation (no `substantive_slot_refs`, no `no_substantive_contract` flag). This is intended. The gto-trainer 2026-05-04 dogfood archive at `bonfire-test/gto-trainer/.bonfire/archive/2026-05-04-gto-trainer-v0.1-dogfood/` is research-only and not affected by going-forward CI.
+Pre-ASSERTION-4 stage products that will fail validation under new rules. F1 stance (intended-fail) applies to all of them. Documented in commit message. The gto-trainer 2026-05-04 dogfood archive is the only known producer of legacy artifacts in this repo; it is research-only.
 
-Commit message must explicitly state: `BREAKING: pre-ASSERTION-4 compile-output.json files fail handoff-validate under Layer M. Intended behavior — see specs/2026-05-04-bonfire-assertion-4-design.md §8.`
+| Stage product | What changed | Failure mode |
+|---|---|---|
+| `compile-output.json` (J) | New `substantive_slot_refs` per unit OR `no_substantive_contract` flag required | Layer M (M.1 OR M.2) fails on missing both |
+| `h-review-verdict.json` (H) | `ruling.action` enum tightened to `{freeze, supersede}` | delta-validate fails on legacy `discard` rulings (e.g., dogfood verdict) |
+| `bonfire-v1.json` consumers (any) | Schema gains `handoff_mandate_params` + `mandate_failure` reentry route | Older validator code reading schema would not find new keys but won't error (graceful — keys are additions); new code on old schema would fail to find params |
+| `state.json` reentry depth tracking | `retry_budget` field on routes table; depth comparisons use it | Pre-ASSERTION-4 state.json files have no retry_budget; default `null` (unlimited) preserves PR #2 behavior |
+
+**Required commit message language:**
+
+```
+BREAKING: pre-ASSERTION-4 stage products fail validation under new rules.
+Affected: compile-output.json (Layer M), h-review-verdict.json (ruling enum).
+Intended behavior per specs/2026-05-04-bonfire-assertion-4-design.md §8.
+```
+
+State file (`state.json`) is forward-compatible (additions, defaults preserve old behavior). Schema file (`bonfire-v1.json`) is forward-compatible for additions; consumers reading new fields are responsible for absence-tolerance.
 
 ## §9 — Non-goals (rejected options preserved here for spec dialectic anchoring)
 
@@ -237,27 +366,33 @@ Options that were considered and rejected during brainstorm — these MUST NOT b
 
 ## §10 — Risks and known unknowns
 
-1. **Calibration fixture #5 produces unusable anchor** (§3.3 kill criterion). If plan calibration shows legitimate-paraphrase overlap < 36%, axis (a) approach breaks. Mitigation: kill criterion explicit; plan must escalate to errata-and-recharter rather than ship a guessed THRESHOLD.
+1. **Calibration fixture #5 produces unusable anchor** (§3.3 kill criterion). If plan calibration shows legitimate-paraphrase overlap ≤ 36% OR gap < 10pp, axis (a) approach is at risk. Mitigation: kill criterion + soft-kill explicit; plan must escalate to errata-and-recharter rather than ship a guessed THRESHOLD.
 
-2. **Layer M (M.2) escape valve abuse**. A J agent could write `no_substantive_contract: true` with a reason that references an unrelated FROZEN entry to satisfy token coverage. Mitigation: dialectic during plan should weigh adding a `_min_reason_token_count: N` constraint or restricting reason references to specific ledger entries cited in implementation_scope. Currently relies on token-coverage stringency (same THRESHOLD as §3.2).
+2. **Layer M (M.2) escape valve abuse**. A J agent could write `no_substantive_contract: true` with a reason that references an unrelated FROZEN entry to satisfy zero-orphan against the cited entry. Mitigation: zero-orphan against cited entry text means reason prose must literally repeat the entry's content tokens — abuse requires the J agent to literally retype the cited entry. Realistically possible but high-friction. Plan dialectic may weigh adding a `_min_reason_token_count: N` constraint if this is exercised by a fixture.
 
-3. **mandate_failure → stage-h routing** may be overzealous for cases where J could self-fix. Same simplification as PR #2's handoff_provenance_failure. ASSERTION-5 B-pending may revisit per-route reset granularity (B002 in backlog).
+3. **mandate_failure retry-budget mechanism** is a new concept introduced by this spec. Risks: (a) budget exhaustion logging may mask repeated J failures of same shape if log analysis is not added; (b) per-conflict-type budget creates a heterogeneous routes table that future routes will need to decide budget for. Mitigation: §4.4 logging requirement creates audit trail; default `retry_budget: null` preserves PR #2 behavior for existing routes.
 
-4. **A1 regex passthrough false positives**. The pattern `/^con-\d+$/i` matches any token of that shape, including (theoretically) prose token sequences that happen to look like CON-NNN. Mitigation: regex is anchored start-to-end; whole-token match only; token boundary set by existing extractSubstantiveTokens whitespace+punctuation rules.
+4. **A1 regex passthrough false positives**. The pattern `/^con-\d+$/i` matches any token of that shape, including (theoretically) prose token sequences that happen to look like CON-NNN. Mitigation: regex is anchored start-to-end; whole-token match only; token boundary set by existing extractSubstantiveTokens whitespace+punctuation rules. §3.1.1 contract test guards the tokenizer behavior.
+
+5. **§4.1 ref-pairing is not strictly enforced (loose traceability residual)**. Per §4.1 a unit's `substantive_slot_refs` must contain ≥1 concrete ref. But the validator does NOT check that supplementary `CON-NNN` refs in the same unit appear inside the cited concrete slot's source_ref. UNIT-3 declaring `["FC-005", "CON-099"]` where FC-005's slot has no relation to CON-099 will pass M.1 validation. Mitigation: the primary loophole (vacuous-pass) is closed by ≥1-concrete rule; weaker traceability concern is acceptable for ASSERTION-4 scope. ASSERTION-5 may add tighter ref-binding if a fixture demonstrates a real abuse.
+
+6. **§3.2.5 lower-biased threshold may compound dogfood operator burden**. Choosing THRESHOLD = lower + ε means more legitimate paraphrases hit the floor and trigger Layer 2b reentries. This is the deliberate trade-off (anti-invention orientation), but plan must observe whether the resulting reentry rate is workable. If post-implementation dogfood shows operators frequently hit Layer 2b reentries for prose that's clearly legit, the offset policy is wrong direction; would trigger errata.
 
 ## §11 — Test plan summary
 
 Plan must produce:
-- Calibration step output (§3.3 j-compile dispatch + overlap distribution analysis)
-- 5 new fixture directories + companion test entries in `tests/test-hj-seam-fixtures.js` (or wherever fixture-driven tests live)
-- Schema delta tests
-- Reentry route table test (mandate_failure presence)
-- Auto-id behavior tests (truth-propose --id auto)
-- Discard-ruling delta-validate rejection test
-- Supersede error message string match test
-- Backward-incompat regression: gto-trainer dogfood compile-output.json now fails handoff-validate (positive assertion that legacy correctly fails)
-
-Plan should also include skill doc update commit (`skills/plan/SKILL.md` Stage E supersede→align guidance).
+- Calibration step output (§3.3 j-compile dispatch + overlap distribution analysis + 5th-percentile + outlier-exclusion application)
+- 5 new fixture directories + companion test entries in `tests/test-hj-seam-fixtures.js`
+- Schema delta tests (handoff_mandate_params block presence and shape)
+- Reentry route table test (mandate_failure entry with retry_budget=2, escalation_target_stage=stage-h)
+- Retry-budget mechanics test (state-reentry depth-vs-budget comparison, escalation behavior at exhaustion)
+- Per-retry log-agent emission test (§4.4 audit-trail requirement)
+- Auto-id behavior tests (`truth-propose --id auto` produces flat CON-NNN)
+- Discard-ruling delta-validate rejection test (per §5.2)
+- Supersede error message string match test (per §5.3)
+- **Tokenization contract regression test** (§3.1.1 — `extractSubstantiveTokens('CON-026 is foo')` returns `['con-026', 'is', 'foo']`)
+- **Backward-incompat positive regression**: dogfood gto-trainer compile-output.json now fails handoff-validate; dogfood h-review-verdict.json discard ruling now fails delta-validate (intended; per §8 table)
+- Skill doc update commit (`skills/plan/SKILL.md` Stage E align-via-token primary guidance per §5.3)
 
 ## §12 — Out-of-scope rerouting
 
