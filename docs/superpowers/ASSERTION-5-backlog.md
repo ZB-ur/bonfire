@@ -85,3 +85,13 @@ This is a living document, NOT a frozen spec. Append items as discovered. When A
 **Estimated effort:** L
 **Dependencies:** ASSERTION-4 close (some drift items resolved by ASSERTION-4 in-scope rows)
 **Notes:** Pattern observed: skill docs (skills/pre/SKILL.md, skills/plan/SKILL.md, skills/code/SKILL.md, skills/achieve/SKILL.md) describe behaviors that have drifted from implementation post-PR#2. After ASSERTION-4 close, do a sweep audit of all four skill docs against current schema + CLI; produce drift-report; propagate fixes. Not a single fix; needs its own mini-milestone scoping.
+
+### B007 — auto-id E3 cascade audit (categories.md / agent prompt prefix tables / category-aware paths)
+
+**Source:** ASSERTION-4 brainstorm Fork E refinement
+**Discovered:** 2026-05-04
+**Kind:** capability
+**Why deferred:** ASSERTION-4 only switches new-entry default to flat CON-NNN auto-id; existing prefix-aware references (RG- / FC- / AS- / RISK- / DROP- / DEP- / FACT- / CLAIM-) survive. Any sweep that touches references/categories.md, agent prompt prefix tables, or category-aware code paths in freeze gate / delta-validate / render templates is out of ASSERTION-4 scope.
+**Estimated effort:** M
+**Dependencies:** ASSERTION-4 close (so flat-CON behavior is observed in production for ≥1 dogfood cycle before cascade)
+**Notes:** ASSERTION-4 spec adds `prefix is recommendation only; tooling assumes flat numbering for auto-id` footnote. B007 is the question of whether to also retire the recommendation entirely. Two sub-options: (X) keep prefix recommendation in references/categories.md but mark as informational-only; (Y) sweep-remove all prefix-aware code and docs. Prefer (X) — prefix carries cognitive value for human readers even if tooling ignores it.
