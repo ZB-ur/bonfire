@@ -173,12 +173,11 @@
     "invalid_stage_j_condition":   { "to": "stage-h", "crosses_pipeline": false },
     "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false },
     "mandate_failure": {
-      "from_pipelines": ["plan"],
-      "target_stage": "stage-j",
-      "target_pipeline": "plan",
-      "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid",
+      "to": "stage-j",
+      "crosses_pipeline": false,
       "retry_budget": 2,
-      "escalation_target_stage": "stage-h"
+      "escalation_target_stage": "stage-h",
+      "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid"
     }
   },
   "categories": {

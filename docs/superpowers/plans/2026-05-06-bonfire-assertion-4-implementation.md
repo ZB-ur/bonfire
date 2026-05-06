@@ -89,21 +89,22 @@ After the existing `handoff_substantive_slots` block in `schemas/bonfire-v1.json
 
 - [ ] **Step 3: Add `mandate_failure` reentry route**
 
-In `schemas/bonfire-v1.json`, locate the `reentry_routes` table. Add the new entry (with the new `retry_budget` and `escalation_target_stage` fields — first appearance of these fields in any route; defaults stay null/absent on existing routes for backward compatibility):
+In `schemas/bonfire-v1.json`, locate the `reentry_routes` table. Add the new entry using the **same compact shape** as existing routes (`{to, crosses_pipeline}`), plus the new `retry_budget` and `escalation_target_stage` fields. Existing routes are preserved verbatim; only `mandate_failure` is added:
 
 ```json
 "reentry_routes": {
   ... existing routes ...,
   "mandate_failure": {
-    "from_pipelines": ["plan"],
-    "target_stage": "stage-j",
-    "target_pipeline": "plan",
-    "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid",
+    "to": "stage-j",
+    "crosses_pipeline": false,
     "retry_budget": 2,
-    "escalation_target_stage": "stage-h"
+    "escalation_target_stage": "stage-h",
+    "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid"
   }
 }
 ```
+
+**Plan-execution finding (2026-05-06, post-Task-1-implementer):** an earlier draft of this snippet used a richer shape (`from_pipelines`, `target_stage`, `target_pipeline` instead of `to`/`crosses_pipeline`). That would have failed at runtime because `bin/lib/state.cjs::stateReentry` reads `route.to` and `route.crosses_pipeline`. The compact shape above is the correct version. `retry_budget` and `escalation_target_stage` are net-new fields used by Task 8.
 
 - [ ] **Step 4: Validate JSON parses**
 
