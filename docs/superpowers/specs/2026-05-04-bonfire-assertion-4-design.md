@@ -3,7 +3,8 @@ title: ASSERTION-4 — Layer 2b Softening + Layer M Mandate
 charter: 2026-05-04-bonfire-maturity-assessment.md (rows #1, #2, #4, #5, #8)
 errata: 2026-05-04-bonfire-maturity-assessment-errata.md
 followup_routing: ASSERTION-5-backlog.md (B001–B007)
-freeze_status: "frozen-with-bounded-calibration — THRESHOLD value is calibrated during plan (§3.3) within bounds defined by §3.2 + fixture lattice §7. §3.2 kill criterion triggers errata + maturity-assessment v2 + spec re-cut. The spec is frozen; only the calibrated parameter inside it is open."
+freeze_status: "invalidated-pending-round-4 — calibration kill-criterion fired during plan Task 4 (2026-05-06). 5th-percentile anchor 0.124 << floor 0.36; gap-width −0.24. See errata-001 for empirical record + round 4 dialectic seeds. Spec is frozen-as-historical-artifact; do NOT consume any of its rules for new implementation. Round 4 spec re-cut supersedes this document."
+errata: 2026-05-04-bonfire-assertion-4-errata-001.md
 purpose: Close two orthogonal seam-validation gaps surfaced by 2026-05-04 dogfood — Layer 2b false-positive rate on legitimate handoff prose (anti-invention over-strictness) and substantive-slot vacuous-pass loophole (anti-omission absence).
 ---
 
