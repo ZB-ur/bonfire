@@ -276,6 +276,41 @@ function compareTokens(slotTokens, sourceText) {
 }
 
 // ---------------------------------------------------------------------------
+// classifyAlignedByToken — §3.3.2 substring classifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Spec §3.3.2 — empirical substring rule for aligned_by token classification.
+ * Used by calibration outlier exclusion (§3.3.2) and pinned by regression
+ * fixture (tests/fixtures/aligned-by-classification/dogfood-2026-05-04-truth.json).
+ *
+ * EXCLUDE iff token contains "-via-" or "-by-" substring.
+ * INCLUDE otherwise (including null, undefined, empty array).
+ *
+ * For an array of tokens, EXCLUDE if ANY single token would EXCLUDE — even
+ * one paraphrase-chain alignment makes the source ledger entry a transitive
+ * paraphrase artifact.
+ *
+ * False-positive whitelist is empty at spec freeze. Operators may add to it
+ * via calibration log review (see spec §3.3.2 calibration log enumeration).
+ */
+const ALIGNED_BY_FALSE_POSITIVE_WHITELIST = new Set([
+  // (empty — populated via calibration decisions)
+]);
+
+function classifyAlignedByToken(token) {
+  if (token == null || token === '') return 'INCLUDE';
+  if (Array.isArray(token)) {
+    if (token.length === 0) return 'INCLUDE';
+    // For an array of tokens, EXCLUDE if ANY single token would EXCLUDE
+    return token.some(t => classifyAlignedByToken(t) === 'EXCLUDE') ? 'EXCLUDE' : 'INCLUDE';
+  }
+  const s = String(token);
+  if (ALIGNED_BY_FALSE_POSITIVE_WHITELIST.has(s)) return 'INCLUDE';
+  return (s.includes('-via-') || s.includes('-by-')) ? 'EXCLUDE' : 'INCLUDE';
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -288,4 +323,6 @@ module.exports = {
   PARAPHRASE_PATTERNS,
   validateHConditions,
   compareTokens,
+  classifyAlignedByToken,
+  ALIGNED_BY_FALSE_POSITIVE_WHITELIST,
 };
