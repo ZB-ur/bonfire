@@ -171,7 +171,15 @@
     "handoff_incomplete":     { "to": "stage-h", "crosses_pipeline": false },
     "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false },
     "invalid_stage_j_condition":   { "to": "stage-h", "crosses_pipeline": false },
-    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false }
+    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false },
+    "mandate_failure": {
+      "from_pipelines": ["plan"],
+      "target_stage": "stage-j",
+      "target_pipeline": "plan",
+      "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid",
+      "retry_budget": 2,
+      "escalation_target_stage": "stage-h"
+    }
   },
   "categories": {
     "retained_goal": {
@@ -226,6 +234,20 @@
     "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section" },
     "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section" }
   },
+  "handoff_mandate_params": {
+    "ref_field": "substantive_slot_refs",
+    "concrete_ref_patterns": [
+      "^FC-\\d+$",
+      "^panel:.+$"
+    ],
+    "supplementary_ref_pattern": "^(?:CON|RG|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+$",
+    "escape_valve": {
+      "flag": "no_substantive_contract",
+      "reason_field": "no_substantive_contract_reason",
+      "reason_ref_pattern": "(?:CON|RG|FC|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
+      "reason_uses_zero_orphan": true
+    }
+  },
   "delta_schemas": {
     "bonfire-d-critique": {
       "required_fields": ["agent", "challenges"],
@@ -252,7 +274,8 @@
           "type": "object",
           "required_fields": ["text", "target_stage"],
           "target_stage_enum": ["stage-j"]
-        }
+        },
+        "ruling_action_enum": ["freeze", "supersede"]
       }
     },
     "bonfire-evaluator": {
