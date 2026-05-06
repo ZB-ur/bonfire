@@ -113,28 +113,51 @@ Rationale for ≥ 6 sample minimum: dogfood produced 0 populated slots (minimal 
 
 Slots whose source ledger entry has certain `aligned_by` token shapes are EXCLUDED from anchor computation. Reason: measuring overlap of slot vs paraphrased-source double-counts paraphrase distance.
 
-**Classification rule (binding):**
+**Classification rule (binding, empirical — derived from dogfood 2026-05-04 archive 14-token forensic):**
 
 ```
-EXCLUDE  if any aligned_by token matches /^stage-.*-(superseded-by|mitigated-via)-/
-INCLUDE  if all aligned_by tokens are in {"stage-g-survival", "stage-h-ruling"}
-INCLUDE  if aligned_by is null, undefined, or empty array
-HALT-AND-CLASSIFY  if any aligned_by token does not fall in EXCLUDE or INCLUDE sets
+EXCLUDE  if token contains substring "-via-" or "-by-"
+INCLUDE  otherwise (including null, undefined, empty array)
+HALT-AND-CLASSIFY  retained as escape valve for shapes the operator
+                   judges genuinely ambiguous (e.g., a -by- token whose
+                   semantic is authority, not paraphrase)
+
+False-positive whitelist: empty at spec freeze. Operators may add shapes
+that contain "-via-" or "-by-" but are confirmed non-paraphrase via
+calibration log review (see plan responsibility below).
 ```
 
-Rationale: positive enumeration (EXCLUDE list only) misses new paraphrase markers introduced after spec freeze (silent inclusion → anchor too low). Negative enumeration (INCLUDE list only) misses new freeze markers (silent exclusion → sample too small). Hybrid + halt forces operator to classify novel values, never silently absorbs them.
+**Why substring rather than positive/negative enumeration:** the dogfood archive emits 14 distinct `aligned_by` values, only 2 of which (`stage-g-survival`, `stage-h-ruling`) are codified at code-level. The other 12 are free-form strings emitted by agents/operators at runtime. Static enumeration of paraphrase markers is brittle in the face of agent behavior; substring detection of forward-port references (`-via-X`, `-by-X` shape) classifies all 14 dogfood values correctly and degrades gracefully on novel shapes (HALT escape).
+
+**Empirical grounding (forensic, 2026-05-06):**
+
+| Substring rule applied to dogfood 14 | Result |
+|---|---|
+| `stage-g-survival` | INCLUDE ✓ |
+| `g-blue` | INCLUDE ✓ |
+| `g-blue-mitigated-via-CON-026..036` (×6) | EXCLUDE ✓ (paraphrase chain via agent prefix) |
+| `stage-e-superseded-by-CON-016` | EXCLUDE ✓ |
+| `stage-e-resolution-via-CON-023` | EXCLUDE ✓ |
+| `stage-e-mitigate-via-mixed-flag-display` | EXCLUDE ✓ (descriptive forward-port; semantically chain) |
+| `stage-e-drop-schema-version-via-CON-024` | EXCLUDE ✓ |
+| `stage-e-accept-30-as-v0.1-budget` | INCLUDE ✓ (residual acceptance) |
+| `stage-e-accept-as-known-limitation-CON-022` | INCLUDE ✓ (CON-022 here is descriptor not via-ref) |
+
+Total: 14/14 correctly classified. The retained PR #2 hardcoded constants (`stage-g-survival`, `stage-h-ruling`) cleanly fall under INCLUDE without special-casing.
 
 **Plan responsibility (preemptive, before calibration dispatch):**
 
 Plan calibration sub-task MUST start with:
 
-1. `grep` all `aligned_by` value emit points across `bin/lib/truth-surface.cjs`, `bin/lib/freeze-enforcement.cjs`, `bin/lib/schema.cjs`, `agents/*.md`, `skills/*/SKILL.md`, and any code path that calls `truth-update --field aligned_by`.
-2. Collect every distinct emitted value (literal strings, format-string templates, dynamically-constructed values).
-3. Classify each into EXCLUDE / INCLUDE per the rule above.
-4. If any value is unclassified by the spec rule, plan HALTS — operator must explicitly classify the novel value, record the decision in calibration log, and if EXCLUDE additions are warranted, trigger errata to update §3.3.2 list.
-5. Only after every emit point is classified, run the calibration dispatch.
+1. `grep` literal aligned_by token emit constants across `bin/lib/truth-surface.cjs`, `bin/lib/freeze-enforcement.cjs`, `bin/lib/schema.cjs`. (Currently this finds 2: TOKEN_STAGE_G, TOKEN_STAGE_H.)
+2. **Scan recent dogfood archive ledger snapshots** at `bonfire-test/*/.bonfire/archive/*/truth-surface/constraint-ledger-snapshot.json` for actual aligned_by values used in production. Free-form agent/operator strings live here, not in code.
+3. Apply substring rule to every distinct value found.
+4. If a value's classification is operator-judged ambiguous (rare, theoretically possible), HALT — operator records the decision in calibration log and (if EXCLUDE→whitelist transition warranted) triggers errata.
+5. Only after enumeration + classification, run the calibration dispatch.
 
-This makes the halt **preemptive** (during plan setup) rather than **reactive** (during data processing). Calibration data flow stays uninterrupted; novel-marker decisions are pushed up to the human at the planning stage where they belong.
+This pushes novel-marker decisions to the human at planning stage, not at data-processing stage. Calibration data flow stays uninterrupted.
+
+**Calibration log enumeration requirement (binding):** the calibration log MUST enumerate the actual EXCLUDE set produced for the calibration sample (i.e., every aligned_by value found that triggered exclusion). Operator inspects this enumeration before accepting the anchor; any value the operator judges should have been INCLUDE goes to the false-positive whitelist (logged as a calibration decision artifact with rationale). This makes whitelist activation a forced review step rather than an after-the-fact discovery.
 
 After exclusion, if remaining sample size < 6, calibration fails (same handling as §3.3.1 minimum violation).
 
@@ -421,6 +444,8 @@ Options that were considered and rejected during brainstorm — these MUST NOT b
 
 6. **§3.2.5 lower-biased threshold may compound dogfood operator burden**. Choosing THRESHOLD = lower + ε means more legitimate paraphrases hit the floor and trigger Layer 2b reentries. This is the deliberate trade-off (anti-invention orientation), but plan must observe whether the resulting reentry rate is workable. If post-implementation dogfood shows operators frequently hit Layer 2b reentries for prose that's clearly legit, the offset policy is wrong direction; would trigger errata.
 
+7. **§3.3.2 substring rule's `-by-` lexical ambiguity**. Rule treats any token containing `-by-` substring as paraphrase chain. Holds empirically for dogfood 2026-05-04 archive (only `superseded-by-CON-NNN` shape observed). Theoretically fragile if future bonfire usage emits authority-class shapes within the `aligned_by` field — e.g. `authored-by-agent-X` (origin marker), `approved-by-user` (authority signal), `discussed-by-team` (provenance). Such tokens would be false-EXCLUDE'd. Mitigation chain: (a) `aligned_by` field semantic is currently constrained to truth-surface alignment context, not authority/origin, so non-paraphrase `-by-` shapes are unlikely by design; (b) §3.3.2 calibration log enumeration forces operator to inspect EXCLUDE set and white-list false positives; (c) B010 structural codification eliminates the ambiguity at the source. ASSERTION-5 may surface this risk as concrete (rather than theoretical) if a future dogfood emits such tokens — at which point errata or B010 acceleration is the response.
+
 ## §11 — Test plan summary
 
 Plan must produce:
@@ -434,6 +459,7 @@ Plan must produce:
 - Discard-ruling delta-validate rejection test (per §5.2)
 - Supersede error message string match test (per §5.3)
 - **Tokenization contract regression test** (§3.1.1 — `extractSubstantiveTokens('CON-026 is foo')` returns `['con-026', 'is', 'foo']`)
+- **aligned_by classification regression fixture** (§3.3.2 substring rule pin): `tests/fixtures/aligned-by-classification/dogfood-2026-05-04-truth.json` stores the dogfood archive's 14 distinct aligned_by values + ground-truth INCLUDE/EXCLUDE labels. Test asserts: applying §3.3.2 substring rule produces identical 14 classifications. Test failure = rule drift (e.g., implementation accidentally added/removed substring matchers, pre-cleaning step changed); investigation required. Sinks the round-3 forensic into a permanent guard.
 - **Backward-incompat positive regression**: dogfood gto-trainer compile-output.json now fails handoff-validate; dogfood h-review-verdict.json discard ruling now fails delta-validate (intended; per §8 table)
 - Skill doc update commit (`skills/plan/SKILL.md` Stage E align-via-token primary guidance per §5.3)
 

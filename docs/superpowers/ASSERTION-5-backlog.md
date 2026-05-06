@@ -115,3 +115,15 @@ This is a living document, NOT a frozen spec. Append items as discovered. When A
 **Estimated effort:** M
 **Dependencies:** ASSERTION-4 close + B002 (per-route reset granularity; B009 is complementary axis on same reentry-routing surface)
 **Notes:** Possible designs: (1) replace global max_depth with per-conflict depth tracking; (2) retain global max_depth but make it auto-raise when per-conflict budgets sum to a higher value; (3) cap chain (e.g., `max_total_depth` AND per-conflict budgets coexist as separate caps). Decision depends on dogfood evidence about whether mandate_failure retry frequency is actually constrained by max_depth in practice. ASSERTION-4 §10.3 records this as a known limitation.
+
+### B010 — Codify aligned_by token shapes (replace free-form strings with structured tokens)
+
+**Source:** ASSERTION-4 spec §3.3.2 round 3 dialectic + dogfood 2026-05-04 forensic
+**Discovered:** 2026-05-06
+**Kind:** design
+**Why deferred:** ASSERTION-4 §3.3.2 currently classifies aligned_by tokens by substring detection (`-via-` or `-by-` → EXCLUDE; otherwise INCLUDE). Empirically correct on dogfood 14-token sample, but the rule is brittle: it relies on unwritten conventions about how agents/operators name alignment authorities. Long-term fix is structural codification at the source.
+**Estimated effort:** M (touches `bin/lib/truth-surface.cjs::update`, all four `agents/bonfire-{d-critique,g-red,g-blue,h-review}.md` prompts, `bin/lib/freeze-enforcement.cjs` constants, render templates that stringify aligned_by, possibly schema delta validators)
+**Dependencies:** ASSERTION-4 close + the §3.3.2 substring rule's empirical pain made visible during ≥1 production cycle
+**Notes:** Replacement candidate shape: structured token `{kind: 'paraphrase_chain' | 'first_alignment' | 'survival' | 'ruling' | 'accept_residual', source_stage: 'stage-d' | 'stage-e' | 'stage-g' | 'stage-h' | 'agent', target_ref: 'CON-NNN' | null, descriptor: string | null}`. Structural codification eliminates the need for §3.3.2's empirical regex entirely; the rule becomes `kind === 'paraphrase_chain' → EXCLUDE`. Until B010 ships, the substring rule is technical debt with a known false-positive surface (§10.7).
+
+**Pre-design intake (binding for B010 spec when it opens):** B010 should also be informed by 1-2 additional dogfood runs after ASSERTION-4 close, to widen the empirical sample of aligned_by shapes beyond gto-trainer's 14 distinct values. The current sample is monoculture: single seed (poker GTO trainer), single agent set, single operator (the architect). Designing the structured `kind` enum from this sample alone is over-fitting risk — a different seed with different agent paths could surface shapes like `stage-d-extended-by-*`, `cross-stage-coalign-*`, or other classes the current sample doesn't contain. B010 spec MUST therefore wait for ≥2 dogfood archives' aligned_by inventory before committing to a kind enum.
