@@ -240,14 +240,25 @@ function validateHConditions(verdict, snapshot) {
 function compareTokens(slotTokens, sourceText) {
   const whitelist = loadFormatWhitelist();
   const sourceTokens = extractSubstantiveTokens(sourceText || '');
+
+  // A1 (ASSERTION-4 §3.1): CON-NNN cross-reference tokens are scaffolding,
+  // not substantive content. Mask them out of BOTH source-set and slot-side
+  // before token coverage diff so they count toward neither overlap nor
+  // orphans. Pattern is /^con-\d+$/i; tokens are already lowercased by
+  // extractSubstantiveTokens, but the /i flag is kept for defensive symmetry
+  // with the spec text.
+  const isConRef = (tok) => typeof tok === 'string' && /^con-\d+$/i.test(tok);
+  const filteredSourceTokens = sourceTokens.filter(t => !isConRef(t));
+  const filteredSlotTokens = (slotTokens || []).filter(t => !isConRef(t));
+
   const sourceSet = new Set();
-  for (const t of sourceTokens) {
+  for (const t of filteredSourceTokens) {
     sourceSet.add(lemmatizeToken(t));
     sourceSet.add(t);  // also keep raw for CJK exact-match
   }
 
   const orphans = [];
-  for (const raw of slotTokens) {
+  for (const raw of filteredSlotTokens) {
     if (raw === undefined || raw === null || raw === '') continue;
     if (whitelist.has(raw)) continue;
     const lemma = lemmatizeToken(raw);
