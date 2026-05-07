@@ -1,0 +1,13 @@
+{
+  "handoff": {
+    "code_ready": false,
+    "handoff_summary": "stage-h condition asks J to define UI panel layout not present in FROZEN ledger",
+    "retained_goal": "n/a — blocked",
+    "implementation_scope": "blocked-pending-h-revision",
+    "implementation_units": []
+  },
+  "reentry_request": {
+    "conflict_type": "invalid_stage_j_condition",
+    "reason": "condition[0] 'add panel layout for X' requires inventing UI semantics — no source coverage in FROZEN ledger"
+  }
+}

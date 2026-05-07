@@ -38,6 +38,13 @@ function installProvenanceFixture(tmpDir, fixtureName) {
   execFileSync('node', [CLI, 'truth-rebuild'], { encoding: 'utf8', cwd: tmpDir });
 }
 
+function installReentryFixture(tmpDir, fixtureName) {
+  const src = path.join(FIXTURE_ROOT, fixtureName);
+  const dst = path.join(tmpDir, '.bonfire', 'plan');
+  fs.mkdirSync(dst, { recursive: true });
+  fs.copyFileSync(path.join(src, 'compile-output.json'), path.join(dst, 'compile-output.json'));
+}
+
 function runValidateConditions(dir) {
   try {
     const stdout = execFileSync('node', [CLI, 'validate-h-conditions'], { encoding: 'utf8', cwd: dir });
@@ -198,6 +205,53 @@ test('fixture: cross-language-approved — Layer 2 (provenance + token coverage)
     installProvenanceFixture(dir, 'cross-language-approved');
     const result = runHandoffValidate(dir);
     assert.equal(result.code, 0, `stderr: ${result.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: legit-reentry-declaration surfaces structured reentry signal on stdout', () => {
+  // Wire integrity test: J emits reentry_request as sibling of handoff with
+  // code_ready=false. CLI must surface it on stdout (exit 1) instead of
+  // collapsing to a generic errors-mode failure.
+  const dir = makeTmpDir();
+  try {
+    installReentryFixture(dir, 'legit-reentry-declaration');
+    const result = runHandoffValidate(dir);
+    assert.equal(result.code, 1, 'B contract: explicit reentry exits non-zero');
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.valid, false);
+    assert.ok(payload.reentry_request, 'reentry_request must be surfaced on stdout');
+    assert.ok(
+      ['invalid_stage_j_condition', 'handoff_provenance_failure'].includes(payload.reentry_request.conflict_type),
+      `unexpected conflict_type: ${payload.reentry_request.conflict_type} (must be a registered route)`
+    );
+    // Source compile-output sanity: code_ready=false (consistency precondition)
+    const co = JSON.parse(fs.readFileSync(
+      path.join(dir, '.bonfire', 'plan', 'compile-output.json'), 'utf8'));
+    assert.equal(co.handoff.code_ready, false, 'fixture must declare code_ready=false');
+    // Backward-compat: reentry payload mutually exclusive with errors-mode shape
+    assert.ok(!payload.error, 'reentry payload must not carry legacy error field');
+    assert.ok(!payload.details, 'reentry payload must not carry legacy details field');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('errors-mode failure preserves legacy {error, details} payload (backward compat)', () => {
+  // Pins the invariant that errors-mode and reentry-mode payloads are
+  // mutually exclusive. Future changes to schema.cjs that fill `errors`
+  // alongside `reentry_request` would break downstream callers; this lint
+  // catches that drift.
+  const dir = makeTmpDir();
+  try {
+    installProvenanceFixture(dir, 'tagged-correct-but-invents');
+    const result = runHandoffValidate(dir);
+    assert.equal(result.code, 1);
+    const payload = JSON.parse(result.stdout);
+    assert.ok(payload.error, 'legacy errors-mode must carry error field');
+    assert.ok(Array.isArray(payload.details), 'legacy errors-mode must carry details array');
+    assert.ok(!payload.reentry_request, 'errors-mode must not surface reentry_request');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
