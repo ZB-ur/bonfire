@@ -1,0 +1,90 @@
+{
+  "calibration_date": "2026-05-06",
+  "spec_ref": "specs/2026-05-04-bonfire-assertion-4-design.md §3.3",
+  "raw_output_ref": ".bonfire-calibration/raw-output-2026-05-06.json (gitignored)",
+  "source_archive": "/Users/lddmay/AiCoding/bonfire-test/gto-trainer/.bonfire/archive/2026-05-04-gto-trainer-v0.1-dogfood/truth-surface/constraint-ledger-snapshot.json",
+  "sample_size_total": 11,
+  "sample_size_after_outlier_exclusion": 9,
+  "outlier_exclusions": [
+    {
+      "ref": "CON-017",
+      "aligned_by": [
+        "g-blue-mitigated-via-CON-026"
+      ],
+      "reason": "transitive paraphrase"
+    },
+    {
+      "ref": "CON-019",
+      "aligned_by": [
+        "stage-e-drop-schema-version-via-CON-024",
+        "g-blue-mitigated-via-CON-027"
+      ],
+      "reason": "transitive paraphrase"
+    }
+  ],
+  "include_reasons_summary": [
+    "CON-026 included: aligned_by=[\"stage-g-survival\"] ratio=0.471",
+    "CON-020 included: aligned_by=[\"g-blue\",\"stage-g-survival\"] ratio=0.124",
+    "CON-034 included: aligned_by=[\"stage-g-survival\"] ratio=0.263",
+    "CON-027 included: aligned_by=[\"stage-g-survival\"] ratio=0.198",
+    "CON-029 included: aligned_by=[\"stage-g-survival\"] ratio=0.189",
+    "CON-036 included: aligned_by=[\"stage-g-survival\"] ratio=0.332",
+    "CON-030 included: aligned_by=[\"stage-g-survival\"] ratio=0.387",
+    "CON-035 included: aligned_by=[\"stage-g-survival\"] ratio=0.147",
+    "CON-036 included: aligned_by=[\"stage-g-survival\"] ratio=0.146"
+  ],
+  "ratios_sorted": [
+    {
+      "ref": "CON-020",
+      "slot_id": "FC-002",
+      "overlap_ratio": 0.12429378531073447
+    },
+    {
+      "ref": "CON-036",
+      "slot_id": "PANEL-002",
+      "overlap_ratio": 0.1457286432160804
+    },
+    {
+      "ref": "CON-035",
+      "slot_id": "PANEL-001",
+      "overlap_ratio": 0.14659685863874344
+    },
+    {
+      "ref": "CON-029",
+      "slot_id": "FC-005",
+      "overlap_ratio": 0.1893491124260355
+    },
+    {
+      "ref": "CON-027",
+      "slot_id": "FC-004",
+      "overlap_ratio": 0.19806763285024154
+    },
+    {
+      "ref": "CON-034",
+      "slot_id": "FC-003",
+      "overlap_ratio": 0.26288659793814434
+    },
+    {
+      "ref": "CON-036",
+      "slot_id": "FC-006",
+      "overlap_ratio": 0.33163265306122447
+    },
+    {
+      "ref": "CON-030",
+      "slot_id": "FC-007",
+      "overlap_ratio": 0.3870967741935484
+    },
+    {
+      "ref": "CON-026",
+      "slot_id": "FC-001",
+      "overlap_ratio": 0.4708994708994709
+    }
+  ],
+  "fifth_percentile_index": 0,
+  "fifth_percentile_anchor": 0.12429378531073447,
+  "passes_minimum_sample": true,
+  "passes_anchor_above_floor": false,
+  "passes_gap_width": false,
+  "threshold_picked": null,
+  "policy_note": "Lower-biased per §3.2.5: floor (0.36) + ε (0.01). Operator override requires explicit rationale."
+}

@@ -1,0 +1,292 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "Build a single-page, locally-hosted browser trainer that drills 6-max NLHE 100bb preflop RFI decisions, grades each answer against an embedded GTO range table, and persists session statistics in localStorage. Five flat files at the repo root (index.html, styles.css, main.js, grader.js, ranges.js) loaded via classic <script src> tags — no build chain, no module system.",
+    "retained_goal": "A vanilla, single-page web app for 6-max NLHE 100bb cash-game preflop Raise-First-In training, scored against the most-frequent canonical action and persisting session stats to localStorage (CON-005).",
+    "implementation_scope": [
+      "Five-file flat layout per CON-016",
+      "Grader contract per CON-020",
+      "Hand-string canonicalization per CON-026",
+      "localStorage hardening per CON-027",
+      "IME-safe keyboard shortcuts per CON-029",
+      "Range-data integrity guard per CON-030",
+      "Within-session dedup per CON-034",
+      "Boot-time validation guard per CON-036"
+    ],
+    "implementation_units": [
+      { "id": "unit-1", "title": "ranges.js data file with sha256 footer", "depends_on": [] },
+      { "id": "unit-2", "title": "grader.js with canonicalize + grade", "depends_on": ["unit-1"] },
+      { "id": "unit-3", "title": "main.js session orchestrator + localStorage layer", "depends_on": ["unit-2"] },
+      { "id": "unit-4", "title": "index.html + styles.css UI shell", "depends_on": ["unit-3"] }
+    ],
+    "function_contracts": [
+      {
+        "id": "FC-001",
+        "name": "canonicalize",
+        "kind": "function",
+        "location": "grader.js",
+        "signature": "canonicalize(s: string): string",
+        "purpose": "Provides a pure normalizer that takes any user- or caller-supplied hand-string variant and reduces it to a canonical member of the frozen 169-string HAND_CLASSES set. The function tolerates differences in rank ordering, letter case, and surrounding whitespace, and throws when the input cannot be reconciled to a known class. Both spot-drawing and grading routines flow their hand inputs through this function before consulting the RANGES table, so the keys used for lookup are always in one consistent form.",
+        "invariants": [
+          "Output is always one of the 169 strings frozen in window.HAND_CLASSES",
+          "ranges.js exports HAND_CLASSES as a frozen array with exactly 169 entries, using high-rank-first ordering, T for ten, uppercase ranks, and lowercase 's' or 'o' suffixes with no whitespace",
+          "drawSpot() and grade() both call canonicalize() before any RANGES indexing"
+        ],
+        "failure_modes": [
+          "Input cannot be mapped to any HAND_CLASSES member — throws synchronously rather than silently returning a wrong key",
+          "If ranges.js drifts so that Object.keys(window.RANGES[pos]) is no longer set-equal to HAND_CLASSES for some position, PROBE-5 must catch it; without canonicalize() in the hot path, any such drift would surface only as a silent throw at runtime"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-026"
+      },
+      {
+        "id": "FC-002",
+        "name": "grade",
+        "kind": "function",
+        "location": "grader.js",
+        "signature": "grade(position: string, hand: string, action: 'R'|'C'|'F'): { correct: boolean, expected: 'R'|'C'|'F'|'R/C'|'R/F'|'C/F', expected_action: 'R'|'C'|'F' }",
+        "purpose": "Implements the scoring contract for a single spot. Given a position, a hand string, and the user's chosen action (Raise, Call, or Fold), it returns a verdict object indicating whether the user was correct, the full expected-action expression (which becomes a slash-joined string like 'R/C' when the range entry has more than one tied top-frequency action), and a single canonical expected_action chosen from any tied set. The boolean correct is true exactly when the user's action appears in the expected expression.",
+        "inputs": [
+          "position — one of UTG, HJ, CO, BTN, SB, BB",
+          "hand — any case/orientation variant accepted by canonicalize()",
+          "action — single character 'R', 'C', or 'F'"
+        ],
+        "outputs": [
+          "correct — true when action is contained in the expected slash-set",
+          "expected — the slash-joined top-frequency action set (one of R, C, F, R/C, R/F, C/F)",
+          "expected_action — a single representative action when expected is a tie"
+        ],
+        "invariants": [
+          "expected always matches the regex /^[RCF](\\/[RCF])*$/ (PROBE-5 contract)",
+          "When the underlying range entry has multiple actions tied at top frequency, every tied action is treated as correct (the score is action-in-set, not action-equals-singleton)",
+          "Mixed-strategy false negatives are accepted as a v0.1 pedagogical limitation: a fold against an 'R/C' entry is still scored wrong"
+        ],
+        "failure_modes": [
+          "Unknown position or unrecognized hand — propagates the canonicalize() throw rather than returning a fabricated verdict",
+          "ranges.js missing a (position, hand) entry that should exist — caught upstream by PROBE-5's set-equality assertion against HAND_CLASSES"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-020"
+      },
+      {
+        "id": "FC-003",
+        "name": "drawSpot",
+        "kind": "function",
+        "location": "main.js",
+        "signature": "drawSpot(sessionDrawnSet: Set<string>): { position: string, hand: string }",
+        "purpose": "Samples a single training spot uniformly at random from the 6 positions × 169 hand classes = 1014-cell space, then enforces within-session uniqueness by keeping a per-session Set keyed by 'position|hand' and re-rolling on collisions. Cross-session uniformity is unchanged — every new session starts with an empty Set — so the long-run distribution still matches CON-018's uniform-over-1014 contract while a single session no longer suffers the birthday-paradox bunching that made early UX feel repetitive.",
+        "invariants": [
+          "Each sample is drawn uniformly across the full 6×169 spot grid",
+          "Within a single session, the same (position, hand) pair will not be returned twice as long as the retry budget holds",
+          "Retry budget is bounded at 50 attempts; if exceeded — which at 30/1014 is essentially impossible — a repeat is accepted rather than blocking the session",
+          "All hand strings emitted route through canonicalize() before being handed to RANGES lookup"
+        ],
+        "failure_modes": [
+          "Pathological exhaustion of the retry budget — falls back to accepting a repeat rather than throwing, so the session never stalls",
+          "Drift between the position list used for sampling and Object.keys(window.RANGES) — caught by the boot guard's check that there are exactly 6 position keys"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-034"
+      },
+      {
+        "id": "FC-004",
+        "name": "loadStats / saveStats",
+        "kind": "module",
+        "location": "main.js",
+        "signature": "loadStats(): StatsObject; saveStats(stats: StatsObject): void",
+        "purpose": "Wraps every read from and write to localStorage in defensive try/catch so that the trainer keeps running even when the browser denies storage. On any SecurityError, QuotaExceededError, or JSON.parse failure, the module silently switches to an in-memory copy of the same stats shape, surfaces a Chinese banner '本次成绩无法持久化' inside the #history-panel, and lets the user finish the session normally. First-spot rendering is never blocked by storage problems. Reads must also tolerate a null value (no prior session) and a malformed JSON payload (corrupted or hand-edited).",
+        "invariants": [
+          "No localStorage call is made outside a try/catch",
+          "When persistence is unavailable, an in-memory object with the same schema continues to absorb increments for the duration of the session",
+          "The single key written is 'gto-trainer-v1-stats', whose value carries total_sessions, total_spots, total_correct, and per-position {spots, correct} sub-objects",
+          "Increments are written immediately after each spot is graded"
+        ],
+        "failure_modes": [
+          "Storage denied (Safari ITP, Firefox private mode, Chrome with site-data disabled, file:// quirks) — caught, banner shown, session continues",
+          "Quota exceeded — caught and treated identically to denial",
+          "Existing JSON corrupted or unparseable — load returns a fresh stats shape rather than throwing",
+          "Multi-tab last-write-wins remains an accepted residual (CON-028); mitigated only by the in-page Chinese note asking the user to keep a single tab open"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-027"
+      },
+      {
+        "id": "FC-005",
+        "name": "keyboardShortcutHandler",
+        "kind": "function",
+        "location": "main.js",
+        "signature": "handleKeydown(event: KeyboardEvent): void",
+        "purpose": "Routes single-letter R/C/F keystrokes to the corresponding action button while staying out of the way when the user is mid-IME composition. The handler only acts when event.isComposing is false, event.keyCode is not 229, no contenteditable / input / textarea ancestor currently holds focus, and no modifier keys are held. The action buttons themselves remain fully clickable by mouse or tap, so even when the keyboard path is suppressed the user can still complete every spot. A UI hint reminds the user '快捷键 R/C/F（输入法激活时请关闭或用按钮）'.",
+        "invariants": [
+          "All four gating predicates must pass before the keystroke is consumed: not composing, keyCode !== 229, no editable focus, no modifiers",
+          "Pointer-driven button clicks are never blocked by IME state",
+          "Suppression is silent — no console error, no flashing UI, just the button path as a fallback"
+        ],
+        "failure_modes": [
+          "Chinese-locale user with IME enabled would otherwise see r/c/f swallowed by composition; the gating predicates prevent the trainer from acting on partial pinyin input",
+          "Browsers that do not populate isComposing fall back on the keyCode 229 sentinel"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-029"
+      },
+      {
+        "id": "FC-006",
+        "name": "bootGuard",
+        "kind": "function",
+        "location": "main.js",
+        "signature": "bootGuard(): void",
+        "purpose": "Runs as the very first step of main.js initialization, before any session state is constructed. It verifies that window.RANGES is a non-null object whose keys count exactly six positions; if any check fails — most commonly because ranges.js had a syntax error and never executed — it writes the Chinese error string '数据加载失败：请检查 ranges.js 语法' into the #spot-display node and aborts the rest of the boot sequence. The intent is that a parse failure produces a visible on-page diagnostic instead of a silent blank screen. Stage F's post-code probe simulates this by temporarily renaming ranges.js and confirming the error text appears.",
+        "invariants": [
+          "Must run before any code that depends on window.RANGES",
+          "Failure is visible to the user as Chinese text inside #spot-display, not just a console message",
+          "On failure, no later boot code runs — the rest of session start is aborted"
+        ],
+        "failure_modes": [
+          "ranges.js fails to parse — guard fires and renders the error string",
+          "ranges.js parses but exports the wrong shape (not 6 positions) — guard fires and renders the same error",
+          "Guard itself is bypassed by being placed below dependent code — caught by the post-code probe"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-036"
+      },
+      {
+        "id": "FC-007",
+        "name": "verifyRangesIntegrity",
+        "kind": "function",
+        "location": "post-code probe",
+        "signature": "verifyRangesIntegrity(): boolean",
+        "purpose": "Backs the data-integrity guard for the range table. ranges.js terminates with a line of the form window.RANGES_SHA256 = '<64-hex>' where the hex digest is the sha256 of canonical JSON.stringify(window.RANGES) computed with both position keys and per-position hand keys sorted. Stage F's post-code probe recomputes the digest from the live object and compares it against the embedded value; any mismatch is a hard failure. The author updates the digest deliberately whenever they intentionally edit a cell, which converts an accidental neighbor-clobber into an immediate red light rather than a silent wrong answer wearing a green checkmark.",
+        "invariants": [
+          "ranges.js ends with window.RANGES_SHA256 = '<64-hex>'",
+          "Digest is computed over canonical JSON with sorted position and hand keys",
+          "Mismatch between recomputed digest and embedded value is a hard fail, not a warning"
+        ],
+        "failure_modes": [
+          "Author edits a cell and forgets to update the hash — probe fails loudly",
+          "Author intentionally edits a cell and refreshes the hash — probe passes, change is auditable in the diff",
+          "Author edits one cell and accidentally clobbers a neighbor — probe fails because the recomputed digest no longer matches"
+        ],
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-030"
+      }
+    ],
+    "domain_model": {
+      "entities": [
+        {
+          "id": "ENT-001",
+          "name": "Spot",
+          "description": "A single training prompt the user is asked to act on. It pairs one of the six 6-max positions (UTG, HJ, CO, BTN, SB, BB) with one of the 169 starting-hand classes, and is the unit on which the grader scores a single Raise/Call/Fold answer. The session orchestrator draws spots one at a time and feeds each into the grader.",
+          "fields": [
+            "position: one of UTG | HJ | CO | BTN | SB | BB",
+            "hand: a 169-class hand string in canonical form (e.g. 'AA', 'AKs', 'AKo', '72o') — high rank first, T for ten, uppercase ranks, lowercase 's'/'o' suffix, no whitespace"
+          ],
+          "invariants": [
+            "Every spot's hand is a member of HAND_CLASSES",
+            "Within a single session no spot repeats (subject to the 50-attempt retry budget)",
+            "Across sessions, the marginal distribution over the 6×169 grid remains uniform"
+          ],
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-017"
+        },
+        {
+          "id": "ENT-002",
+          "name": "SessionStats",
+          "description": "The persistent shape stored under the single localStorage key 'gto-trainer-v1-stats'. It accumulates lifetime totals across every session the user has completed on this browser, plus per-position breakdowns. The orchestrator increments it after each graded spot. The schema deliberately omits a version field — a v2 schema, if it ever happens, will own its own migration.",
+          "fields": [
+            "total_sessions: integer count of completed sessions",
+            "total_spots: integer count of graded spots across all sessions",
+            "total_correct: integer count of spots judged correct",
+            "by_position: object keyed by UTG / HJ / CO / BTN / SB / BB, each value an object { spots, correct }"
+          ],
+          "invariants": [
+            "Single localStorage key, exact name 'gto-trainer-v1-stats'",
+            "Per-position correct never exceeds per-position spots",
+            "Sum of by_position[*].spots equals total_spots; same for correct",
+            "Every increment happens immediately after the spot is graded, inside the try/catch storage layer"
+          ],
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-019"
+        }
+      ]
+    },
+    "ui_contract": {
+      "panels": [
+        {
+          "id": "PANEL-001",
+          "name": "history-panel",
+          "description": "An aggregate dashboard that summarizes performance across every session ever recorded in localStorage on this browser. Unlike the per-session-end panel — which only reports overall correct/30 because the per-position slice has expected n=5 and is dominated by sampling noise — the history panel is the place where the per-position correct-rate breakdown is allowed to appear, because once roughly ten sessions have accumulated the per-position counts cross the n>=10 display threshold and become readable signal. This panel is also where the storage-failure banner '本次成绩无法持久化' surfaces when localStorage is unavailable.",
+          "elements": [
+            "Lifetime totals: total_sessions, total_spots, total_correct, overall correct rate",
+            "Per-position correct-rate breakdown for UTG, HJ, CO, BTN, SB, BB — each gated on n>=10 spots before its rate is rendered",
+            "Single-tab Chinese reminder: '请只开一个标签页练习；多标签会让 session 计数互相覆盖。'",
+            "Conditional Chinese banner '本次成绩无法持久化' shown when the storage layer has fallen back to in-memory mode"
+          ],
+          "states": [
+            "empty (no prior sessions): displays a placeholder rather than misleading zeros",
+            "below-threshold (some positions still under 10 spots): those positions suppress their rate; only positions at or above the threshold show numbers",
+            "fully-populated: every position shows its own correct rate alongside the lifetime totals",
+            "persistence-degraded: the in-memory-only banner is visible above the totals"
+          ],
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-035"
+        },
+        {
+          "id": "PANEL-002",
+          "name": "spot-display",
+          "description": "The primary panel that shows the current spot to the user and houses the Raise / Call / Fold action buttons. It is also the failure-surface for boot problems: when bootGuard detects that window.RANGES is missing, null, or has the wrong number of position keys — typically because ranges.js failed to parse — the panel is replaced with the Chinese error string '数据加载失败：请检查 ranges.js 语法'. Action buttons remain mouse- and tap-clickable at all times; the keyboard-shortcut path is layered on top with IME-safe gating.",
+          "elements": [
+            "Current spot rendering: position label (English abbreviation UTG/HJ/CO/BTN/SB/BB) plus the canonical hand string",
+            "Three action buttons R, C, F — pointer-driven entry points that are never blocked",
+            "Keyboard-shortcut hint: '快捷键 R/C/F（输入法激活时请关闭或用按钮）'",
+            "Failure mode: replaces its content with '数据加载失败：请检查 ranges.js 语法' when bootGuard fails"
+          ],
+          "states": [
+            "boot-failed: shows the Chinese ranges-load error and the rest of session start is aborted",
+            "awaiting-answer: a spot is rendered and the user has not yet chosen an action",
+            "showing-result: post-grade view that displays the user's answer, the expected action(s), and a 混合策略 tag when expected is a slash-set like 'R/C'",
+            "session-complete: hands off to the per-session-end summary (overall correct/30) before the user opens a new session"
+          ],
+          "source_kind": "ledger_direct",
+          "source_ref": "CON-036"
+        }
+      ]
+    }
+  },
+  "canonical_contracts": {
+    "note": "Calibration artifact — companion sections intentionally minimal; substantive prose lives in handoff.function_contracts / domain_model.entities / ui_contract.panels."
+  },
+  "constraint_crosswalk": {
+    "CON-005": ["handoff.retained_goal"],
+    "CON-016": ["handoff.implementation_scope[0]"],
+    "CON-017": ["domain_model.entities[ENT-001]"],
+    "CON-019": ["domain_model.entities[ENT-002]"],
+    "CON-020": ["function_contracts[FC-002]"],
+    "CON-026": ["function_contracts[FC-001]"],
+    "CON-027": ["function_contracts[FC-004]"],
+    "CON-029": ["function_contracts[FC-005]"],
+    "CON-030": ["function_contracts[FC-007]"],
+    "CON-034": ["function_contracts[FC-003]"],
+    "CON-035": ["ui_contract.panels[PANEL-001]"],
+    "CON-036": ["function_contracts[FC-006]", "ui_contract.panels[PANEL-002]"]
+  },
+  "execution_manifest": {
+    "order": ["unit-1", "unit-2", "unit-3", "unit-4"]
+  },
+  "code_batches": {
+    "note": "Calibration artifact — not used to drive code stage."
+  },
+  "code_preflight": {
+    "confirmed_repo_facts": {},
+    "do_not_reinterpret": [],
+    "do_first": [],
+    "context_bundle": [],
+    "current_focus": null,
+    "progress_snapshot": null,
+    "remaining_work": null,
+    "session_notes": null,
+    "blockers": [],
+    "pause_conditions": []
+  },
+  "compile_summary": "Calibration compile for ASSERTION-4 threshold anchoring. 7 function_contracts, 2 entities, and 2 panels populated as natural-paraphrase of cited FROZEN ledger entries (CON-005, CON-017, CON-019, CON-020, CON-026, CON-027, CON-029, CON-030, CON-034, CON-035, CON-036). Each substantive slot uses source_kind=ledger_direct with a string source_ref to a single FROZEN entry. CON-* tokens appear in prose as cross-reference scaffolding per A1 passthrough principle, not as invented content.",
+  "final_handoff": "Calibration artifact — not for code stage consumption."
+}
