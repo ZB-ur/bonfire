@@ -60,3 +60,21 @@ bonfire-tools.cjs handoff-validate
 ```
 
 Required fields: `code_ready`, `handoff_summary`, `retained_goal`, `implementation_scope`, `implementation_units` (non-empty array).
+
+## v2 schema — substantive content deep-check (Assertion 3a)
+
+As of `schema_version: 2`, every slot in `handoff_substantive_slots` enforces
+a structural deep-check at validation time, not just a shape hint:
+
+- **`min_entries: 1`** (per_entry kind): the slot's array must have at least one entry.
+- **`required_subfields: [name, ...]`**: each entry (per_entry) or the section itself (whole_section) must contain these subfields, and each must pass `isEmptyOrPlaceholder = false`.
+
+`isEmptyOrPlaceholder` rejects: null, undefined, empty arrays/objects, empty
+or whitespace-only strings, and registered placeholder strings (`TODO`,
+`see ledger`, `...`, `<TBD>`, `<placeholder>`, case-insensitive).
+
+The existing `no_substantive_contract` escape valve continues to work but
+now uses a ref-only check: the `no_substantive_contract_reason` must contain
+≥1 ledger ID matching `schema.ledger_id_pattern` that resolves against the
+active FROZEN ledger snapshot. The previous prose token-coverage check on
+the reason field has been removed (see ASSERTION-3a spec DQ-1).
