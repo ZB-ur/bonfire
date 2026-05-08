@@ -1,0 +1,31 @@
+{
+  "agent": "bonfire-g-blue",
+  "proposals": [
+    {"id": "CON-017", "category": "frozen_constraint", "content": "RU-15 Phase 2 归一化扩展三步: (P2.0) BiDi 控制字符剥离 U+202A-202E + U+2066-2069; (P2.1) NFC 组合标记折叠 (剥离 U+0300-036F 非语义组合标记); (P2.2) Variation Selector 剥离 U+FE00-FE0F + U+E0100-E01EF. 顺序: BiDi -> NFKC -> 组合标记 -> 零宽 -> Variation Selector -> 简繁 -> 拼音 -> emoji 别名. 闭合 RISK-006.", "rationale": "RISK-006 5 行 JS 攻击成立, 修复成本 < 30 行代码."},
+    {"id": "CON-018", "category": "frozen_constraint", "content": "FloodDetector 双轨 hard-cap: (a) 时间窗 60s 默认可在 RU-08 调到 5min/10min 适配低流量房间; (b) Map.size 硬上限 8192, LRU 淘汰; (c) 单 tick (1s) 最大入桶速率 500, 超过即降级为 sampling. 闭合 RISK-007 + d-critique 慢房间挑战.", "rationale": "Burst 攻击 + 慢房间挑战联合修复."},
+    {"id": "CON-019", "category": "frozen_constraint", "content": "RU-14 PROBATION 闭环: (a) PROBATION = skip detector + 写 audit log, 非隐式硬白名单; (b) 同 uid PROBATION 内 RU-09 浮层标记'其实是噪声' >= 3 次自动出 PROBATION 进 detector; (c) RU-08 提供 '清空 PROBATION' 按钮; (d) /code 第一次 dev session 实测 medalLevel 可见率, < 50% 时 RU-14 默认改为 'fans-medal-only -> 进 detector + 0.2 confidence 减分' 而非旁路.", "rationale": "RISK-008 + PR-1 INABILITY_TO_PROBE 联合修复."},
+    {"id": "CON-020", "category": "frozen_constraint", "content": "RU-13 词典审计强制: (a) 引入开源词典必须人工剥离政治审查类 (人名/事件/地名), 仅留 profanity/人身攻击/广告; (b) 仓库内 dict/audited-zh-profanity.txt 单文件呈现 + README 标注 license/source commit/removed-categories; (c) RU-08 高级设置可关闭 ToxicDetector 整体 (用户主动 opt-out 不算违反 frozen_for_code). 闭合 RISK-009.", "rationale": "字典污染攻击命中 CON-010 边界, 必须 mitigate."},
+    {"id": "CON-021", "category": "frozen_constraint", "content": "RU-09 反馈循环安全栏: (a) 'Always allow' 二次确认弹窗显示原文与 category; (b) 速率限制 10 条/分钟, 触上限锁 60s; (c) 7 天衰减 + bulk revoke 按钮; (d) toxic category 的 Always allow 需键入 'CONFIRM' 字符串, 60s 会话白名单完全禁用 toxic 旁路; (e) 浮层显示 'always-allow 总数 + 7 天新增' 用户可见审计. 闭合 RISK-011.", "rationale": "投毒漏洞 mitigate, 全套 audit log 省略以匹配自用 MVP."},
+    {"id": "CON-022", "category": "frozen_constraint", "content": "isPaid + fans-medal 防伪: (a) WhitelistEngine 不再单独依赖 fans-medal class, 必须组合至少 2 DOM 信号 (medalLevel 数据属性 + 节点祖先含 .super-chat-message 容器, 或 guard-level-N + role badge); (b) 单一 fans-medal class 仅触发 PROBATION 不进硬白名单; (c) isPaid:true 必须由专用 SC/上舰容器 (.super-chat-message, .gift-bubble) 父层级验证. 闭合 CON-013/CON-006 forgery 攻击.", "rationale": "双信号 + 容器层级是 DOM 启发式可达下界, 加密认证超 MVP scope."}
+  ],
+  "alignments": [
+    {"target": "RISK-006", "evidence": "BiDi/combining/variation-selector 是真实存在的绕过手段, RU-15 Phase 2 不完备. CON-017 闭合."},
+    {"target": "RISK-007", "evidence": "Sustained burst 攻击成立, ACC-002 仅测 8h 被动. CON-018 双轨 hard cap 闭合."},
+    {"target": "RISK-008", "evidence": "PR-1 INABILITY_TO_PROBE 让 PROBATION 实质永久. CON-019 提供反向路径."},
+    {"target": "RISK-009", "evidence": "字典污染命中 CON-010 censorship-adjacency. CON-020 闭合."},
+    {"target": "RISK-011", "evidence": "RU-09 缺速率限制/衰减/audit. CON-021 闭合."},
+    {"target": "CON-013", "evidence": "isPaid + DOM 启发式可被多扩展环境伪造. CON-022 闭合主要风险, 完全防伪超 MVP."},
+    {"target": "RISK-010", "evidence": "Bilibili 反扩展是真实平台行为, 接受残余风险: 用户自用 sideload + per-install 随机 namespace 会破坏共存 + 平台封号属用户自担. 不引入反检测专项."},
+    {"target": "RU-08", "evidence": "5MB quota / 跨扩展可读真实但用户人格自用 + 5MB 远超关键词需求 + 跨扩展依赖对方拥 management 权限 (主机沦陷的更深层问题). 接受残余, /code 阶段在 popup 显式提示 quota 失败."},
+    {"target": "DEP-001", "evidence": "@crxjs/vite-plugin 供应链风险真实但不可消除. pnpm lockfile + 公开 commit hash 审计是 MVP 上限. 不引入 npm-audit 流水线 (人格不长期维护)."},
+    {"target": "RU-12", "evidence": "ESLint 可被绕过, 但单一开发者 + MV3 manifest host_permissions + CSP 阻断 eval 已是兜底. 不加 runtime CSP 自检."},
+    {"target": "ACC-006", "evidence": "(3)(8) 主观性成立但是 ACC-001 不可证伪的进步. 用户人格选择 qualitative; (3) 补'若房间无复读则 N/A'."},
+    {"target": "CON-009", "evidence": "敌对扩展抢占 WS / defineProperty 绕过成立. 接受残余风险: 自用 sideload + 防御敌对扩展属浏览器沙箱职责, CON-009 只承诺与主流良性扩展共存."},
+    {"target": "CON-016", "evidence": "user-whitelist vs toxic 优先级未定 + 投毒. CON-021 (e) toxic always-allow 强阻断已闭合. 多标签优先级仅用于 UI 主因展示, 不参与决策."}
+  ],
+  "follow_up_questions": [
+    "CON-019 medalLevel 可见率 50% 阈值由 /code 第一次 dev session 直接决议入仓?",
+    "CON-020 词典是否保留 pre-audit hash + post-audit hash 双文件供透明? 还是仅 audited 单文件 + audit log?",
+    "RISK-010 若实际触发 (用户报告封号), trigger 紧急 hotfix 还是 deprecate 扩展? 退出策略未定."
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "agent": "bonfire-g-red",
+  "challenges": [
+    {"target": "CON-005", "reason": "BiDi/combining/variation-selector evasion: NFKC + zero-width strip don't cover U+202A-202E, U+0300-036F, U+FE00-FE0F. Adversary breaks FloodDetector by inserting random RLO between identical复读 text."},
+    {"target": "CON-006", "reason": "Hard whitelist on fans-medal class via DOM heuristic is forgeable. 1 元 buys fans-medal; hostile coexistence extensions can inject fans-medal class onto noise nodes for whitelist immunity."},
+    {"target": "CON-009", "reason": "Multi-extension coexistence does not address ADVERSARIAL coexistence. Hostile extension can strip bdd-* classes, win WS prototype patch race, or use Object.defineProperty to bypass WeakMap dedup."},
+    {"target": "CON-010", "reason": "Censorship-adjacency boundary is one-directional. No countermeasure for Bilibili A/B-testing extension detection that flags accounts, injects counter-CSS, or canvas-re-renders. RISK-001 only covers indirect risk control."},
+    {"target": "RU-13", "reason": "Open-source zh-Hans sensitive-word lists mix political censorship terms with profanity — silently performs client-side political censorship, violating CON-010 + user trust. Attribution not addressed. zh-Hant/Japanese exclusion violates CON-001 'no subset' for VTuber rooms."},
+    {"target": "RU-14", "reason": "PROBATION paradox: skip-detector interpretation = hard-whitelist by another name; run-with-threshold interpretation = threshold undefined. Plus PR-1 INABILITY_TO_PROBE means PROBATION is permanent default, not fallback."},
+    {"target": "RU-08", "reason": "chrome.storage.local 5MB quota, no atomicity, cross-extension readable with management permission, no schema migration, no corruption recovery, silent fail on quota exceeded."},
+    {"target": "RISK-002", "reason": "Sustained-burst attack: 50K unique-padded danmaku/30s pins lastSeenTs forever, GC never evicts, Map grows unboundedly. RU-12 requestIdleCallback starved during burst."},
+    {"target": "ACC-006", "reason": "Binary checklist still subjectively interpretable. Item (3) '至少 1 次复读折叠生效' fails on quiet rooms with no复读. Item (8) '50% 通过' over undefined denominator. Item (4) requires devtools snippet not user-reproducible."},
+    {"target": "CON-016", "reason": "Multi-label priority ladder creates user-whitelist vs toxic-priority undefined precedence. Attacker poisons via RU-09 'always allow' on benign-looking string then mutates to toxic with same normalizedText."},
+    {"target": "CON-013", "reason": "isPaid:bool non-optional + RU-04 '=true -> hard whitelist' + DOM heuristic = SC-masquerade attack. Skin extensions or A/B variants set 'paid' class on regular danmaku; once true, permanent immunity."},
+    {"target": "PR-1", "reason": "INABILITY_TO_PROBE for PR-1/PR-2/PR-3 with 'defer to /code' is a handoff-quality-bar violation. RU-14 PROBATION default depends on PR-1; RU-03 SelectorRegistry depends on PR-2; bfcache wiring depends on PR-3. Stage F failed but pretends success."},
+    {"target": "RU-09", "reason": "Model poisoning surface: 'Always allow' has no rate limit, no decay, no bulk-revoke, no audit. Storage compromise injects 1000 toxic allowances. 60s session whitelist has no debounce — race to slip toxic through."},
+    {"target": "DEP-001", "reason": "Supply-chain risk on @crxjs/vite-plugin (small team, no version pinning policy, no audit step, no Rollup fallback). MV3 deprecation cycle could break sideload."},
+    {"target": "RU-12", "reason": "ESLint 'no-network-call' insufficient: dynamic URL construction evades string-match; chrome.runtime.sendMessage to background fetch evades; minified vendored deps invisible; runtime CSP not enforced; user can self-grant via manifest edits."}
+  ],
+  "proposals": [
+    {"id": "RISK-006", "category": "high_impact_risk", "content": "BiDi/combining-mark/variation-selector Unicode evasion on FloodDetector + LowInfoDetector. Pipeline does not strip U+202A-202E, U+0300-036F, U+FE00-FE0F. 5 lines of attacker JS evades flood + lowinfo class entirely.", "rationale": "RU-15 Phase 2 enumerated steps insufficient."},
+    {"id": "RISK-007", "category": "high_impact_risk", "content": "Sustained-burst memory exhaustion: 50K unique-padded danmaku in 30s pins lastSeenTs, GC never evicts, Map.size unbounded. ACC-002 only catches passive 8h growth, not adversarial burst.", "rationale": "RISK-002 misses INSTANTANEOUS Map size bound."},
+    {"id": "RISK-008", "category": "high_impact_risk", "content": "RU-14 PROBATION is production default (not fallback) because PR-1 INABILITY_TO_PROBE. fans-medal class (forgeable for 1 元) bypasses all 5 detectors with no path back to enforcement after offenses.", "rationale": "RU-14 success_criteria depends on Stage F data never collected."},
+    {"id": "RISK-009", "category": "high_impact_risk", "content": "Dictionary contamination: open-source zh-Hans lists bundle political censorship with profanity. Sideloading silently censors political speech beyond user intent. Violates CON-010 + user trust + license attribution.", "rationale": "RU-13 cites textfilter/sensitive-word without content audit."},
+    {"id": "RISK-010", "category": "high_impact_risk", "content": "Bilibili anti-extension counter-detection: A/B-tested DOM scanner detects bdd-* / aria-hidden patterns, may shadowban, inject counter-CSS, or canvas-re-render. CON-010 only forbids our aggression, not platform's.", "rationale": "RISK-001 covers indirect risk-control trip; this is active anti-extension policy."},
+    {"id": "RISK-011", "category": "high_impact_risk", "content": "Model poisoning via RU-09 'Always allow': no rate limit, no audit, no decay, no bulk-revoke. Compromised storage / accidental click / UI confusion permanently disables detector class. 60s '放回' has no debounce.", "rationale": "CON-011 promises feedback-adjusts-thresholds with zero feedback security model."}
+  ],
+  "follow_up_questions": [
+    "RU-15 Phase 2 should add BiDi strip / NFC combining fold / variation-selector strip. Confirm?",
+    "PROBATION semantic: skip vs reduced-threshold. Pick one and freeze.",
+    "Dictionary content audit: explicit step to strip political terms from imported zh-Hans lists. Confirm scope?",
+    "FloodDetector burst handling: bounded queue + backpressure?",
+    "Per-install random namespace prefix to defeat detection?",
+    "RU-09 rate limits, audit log, bulk-revoke UI, friction proportional to category?",
+    "chrome.storage.local quota: surfaced UI error or silent fail?",
+    "unlimitedStorage permission across Firefox/Edge/套壳?",
+    "Cryptographic role authority vs DOM heuristic?",
+    "Is PR-1/2/3 INABILITY_TO_PROBE blocking H or silently waived?"
+  ]
+}

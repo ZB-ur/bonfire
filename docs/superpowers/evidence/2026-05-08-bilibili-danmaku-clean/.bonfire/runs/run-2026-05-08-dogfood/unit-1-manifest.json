@@ -1,0 +1,89 @@
+{
+  "unit": "unit-1",
+  "iteration": 1,
+  "files_created": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "tsconfig.json",
+    "vite.config.ts",
+    "manifest.json",
+    ".eslintrc.cjs",
+    "src/background/sw.ts",
+    "src/content/index.ts",
+    "src/popup/index.html",
+    "src/popup/main.ts",
+    "src/options/index.html",
+    "src/options/main.ts",
+    "README.md"
+  ],
+  "files_modified": [],
+  "commands_run": [
+    "npm install -g pnpm@9.0.6",
+    "pnpm install",
+    "pnpm build",
+    "pnpm typecheck",
+    "pnpm lint",
+    "ls -R dist/",
+    "du -sh dist/"
+  ],
+  "build_output_summary": {
+    "tool": "vite 5.2.10 + @crxjs/vite-plugin 2.0.0-beta.25",
+    "status": "success",
+    "build_time_ms": 73,
+    "dist_present": true,
+    "dist_size": "72K",
+    "dist_under_500kb_budget": true,
+    "dist_manifest_valid_mv3": true,
+    "dist_manifest_keys": [
+      "manifest_version=3",
+      "permissions=['storage']",
+      "host_permissions=live.bilibili.com + www.bilibili.com",
+      "background.service_worker=service-worker-loader.js (CRX-emitted loader pointing to src/background/sw.ts bundle)",
+      "background.type=module",
+      "content_scripts.matches=live.bilibili.com + www.bilibili.com, run_at=document_idle, all_frames=false",
+      "action.default_popup=src/popup/index.html",
+      "options_ui.page=src/options/index.html, open_in_tab=true",
+      "no webRequestBlocking",
+      "no remote code"
+    ],
+    "typecheck": "passed (tsc --noEmit clean)",
+    "lint": "passed (eslint clean)",
+    "lockfile": "pnpm-lock.yaml generated (2505 lines)"
+  },
+  "engineering_decisions": [
+    "Installed pnpm 9.0.6 globally via npm because pnpm was not on PATH and corepack was unavailable. The handoff explicitly mandates pnpm + lockfile, so this preserves the frozen toolchain rather than swapping to npm.",
+    "Pinned dependency versions explicitly in package.json (no caret-only ranges) so the generated pnpm-lock.yaml reflects deterministic versions consistent with @crxjs/vite-plugin 2.0.0-beta.25 + vite 5.2.10 + typescript 5.4.5 + vitest 1.5.0.",
+    "Used @crxjs/vite-plugin's defineManifest helper in vite.config.ts to satisfy strict TS typing of the imported manifest.json. This is a low-impact engineering wiring choice — the manifest's product semantics are unchanged.",
+    "Added /// <reference lib=webworker /> + declare const self: ServiceWorkerGlobalScope in src/background/sw.ts so MV3 SW types resolve under strict TS. WebWorker added to tsconfig.lib.",
+    "Added defensive iframe guard (window.top === window.self) in src/content/index.ts. Manifest already sets all_frames=false, so this is belt-and-suspenders for unit-1's empty stub.",
+    "Added eslint no-restricted-globals for fetch / XMLHttpRequest / WebSocket as a coarse FPD-4 guard. The proper RU-12 hostname-aware custom rule lands in a later unit per file_plan.",
+    "Removed manifest.json from tsconfig.include because @crxjs/vite-plugin already imports it via assert{type:json}; including it in tsc twice produced duplicate-typing noise."
+  ],
+  "deviations_from_handoff": [
+    {
+      "type": "toolchain_install",
+      "detail": "Installed pnpm via `npm install -g pnpm@9.0.6` because pnpm was not on PATH. This is consistent with the frozen toolchain (pnpm), not a substitution. No semantic deviation."
+    },
+    {
+      "type": "no_icons_supplied",
+      "detail": "manifest.json declares an empty `icons` object. The handoff did not specify icon assets for unit-1, and inventing icon files would be a product/UX decision outside allowed_decisions. Default Chrome puzzle-piece icon is shown in chrome://extensions until icons are provided in a later unit."
+    }
+  ],
+  "verification_results": {
+    "pnpm_install": "passed (247 packages, 29.2s)",
+    "pnpm_build": "passed (vite build, 73ms, dist/ produced)",
+    "dist_manifest_json_valid": "passed (manifest_version=3, all required MV3 fields present, no webRequestBlocking, no remote code)",
+    "load_unpacked_dist": "not_executed_in_this_environment (requires Chrome GUI; manifest schema validated structurally; will be confirmed in browser_checks at /achieve)",
+    "service_worker_cold_start_under_50ms": "not_measured_in_this_environment (requires chrome://extensions runtime; SW body is essentially empty so the budget should hold; will be measured in browser_checks at /achieve)"
+  },
+  "ambiguities": [
+    {
+      "field": "icons",
+      "question": "No icon assets were specified by the handoff for unit-1. manifest.json currently declares an empty icons object. Decide in a later unit (or in /achieve browser_checks) whether icons are required for first-open UX."
+    },
+    {
+      "field": "service_worker cold-start measurement",
+      "question": "done_when[2] requires SW cold start < 50ms but no measurement harness is described in unit-1. Measurement belongs to /achieve browser_checks; flagging here so the evaluator does not treat absence as a regression."
+    }
+  ]
+}

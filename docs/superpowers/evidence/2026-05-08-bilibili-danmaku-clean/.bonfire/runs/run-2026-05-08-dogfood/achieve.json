@@ -1,0 +1,23 @@
+{
+  "verdict": "not_achieved",
+  "acceptance_results": [
+    {"check": "AC-1 ACC-001 qualitative", "result": "not_run", "reason": "Requires live Bilibili room session"},
+    {"check": "AC-2 ACC-002 8h memory", "result": "not_run", "reason": "Requires 8h live session"},
+    {"check": "AC-3 ACC-003 multi-extension", "result": "not_run", "reason": "Requires Chrome GUI"},
+    {"check": "AC-4 ACC-004 normalize idempotency", "result": "not_run", "reason": "unit-3 not implemented"},
+    {"check": "AC-5 ACC-005 whitelist priority", "result": "not_run", "reason": "unit-5 not implemented"},
+    {"check": "AC-6 ACC-006 8-item binary checklist", "result": "not_run", "reason": "Requires live rooms"},
+    {"check": "AC-7 FPD-4 zero outbound calls", "result": "passed", "evidence": "Static grep + ESLint no-restricted-globals"},
+    {"check": "AC-8 FPD-3 + CON-022 dual-signal", "result": "not_run", "reason": "unit-5 not implemented"},
+    {"check": "AC-9 CON-019 PROBATION", "result": "not_run", "reason": "unit-1.5 + unit-5 not implemented"},
+    {"check": "AC-10 CON-020 dict", "result": "not_run", "reason": "unit-9 not implemented"}
+  ],
+  "followups": [
+    "13 of 15 implementation_units (unit-1.5 / unit-3..15) not yet implemented",
+    "All 13 browser_checks pending Chrome GUI test session",
+    "AC-1 / AC-6 qualitative + binary checklist need real Bilibili room session"
+  ],
+  "failure_reason": "Code stage completed only unit-1 (skeleton) + unit-2 (types/settings) of 15+ units due to dogfood-test scope limit. Acceptance can not be achieved without remaining units.",
+  "judged_at": "2026-05-08T00:55:00Z",
+  "dogfood_test_meta_verdict": "achieved — bonfire pipeline ran end-to-end through 4 stages (pre/plan/code/achieve), exposing 14+ production-grade and ergonomic findings documented in dogfood-log.md including the predicted Layer 2a/2b vacuous-pass loophole + maturity-gate paradox + apply-h-rulings strict mode + state-init unit-1.5 ID dropping."
+}

@@ -1,0 +1,85 @@
+{
+  "agent": "bonfire-evaluator",
+  "unit_id": "unit-1",
+  "verdict": "PASS",
+  "conflict_type": null,
+  "issues": [],
+  "evidence": [
+    {
+      "check": "all_13_unit_files_exist",
+      "result": "pass",
+      "detail": "Verified presence of every file in unit-1.files: package.json, pnpm-lock.yaml (79978 bytes, 2505 lines), tsconfig.json, vite.config.ts, manifest.json, .eslintrc.cjs, src/background/sw.ts, src/content/index.ts, src/popup/index.html, src/popup/main.ts, src/options/index.html, src/options/main.ts, README.md."
+    },
+    {
+      "check": "mv3_manifest_schema",
+      "result": "pass",
+      "detail": "Both source manifest.json and dist/manifest.json declare manifest_version=3 (FPD-7/CON-012). permissions=['storage'] only. host_permissions limited to https://live.bilibili.com/* and https://www.bilibili.com/* (no other Bilibili subdomains, no broad-host permission). background.type='module', background.service_worker present. content_scripts.run_at='document_idle', all_frames=false. action.default_popup and options_ui.page wired. icons={} present (acceptable per coder's deviations note; handoff did not mandate icons for unit-1)."
+    },
+    {
+      "check": "no_webRequestBlocking_no_remote_code",
+      "result": "pass",
+      "detail": "manifest declares no webRequestBlocking permission and no remote-code-execution permissions. Permissions array contains only 'storage'."
+    },
+    {
+      "check": "pnpm_build_reproducible",
+      "result": "pass",
+      "detail": "Re-ran `pnpm build` in clean shell. Vite 5.2.10 + @crxjs/vite-plugin 2.0.0-beta.25 produced dist/ in 74ms with same artifact set as coder manifest. dist size 72K (well under RU-13's 500KB budget). dist/manifest.json regenerated identically. service-worker-loader.js emits import './assets/sw.ts-C3zuSbIJ.js'."
+    },
+    {
+      "check": "fpd_4_no_outbound_calls",
+      "result": "pass",
+      "detail": "grep across src/, manifest.json, vite.config.ts, tsconfig.json, package.json for fetch(/XMLHttpRequest/new WebSocket/sendBeacon yielded zero matches. ESLint no-restricted-globals rule additionally bans fetch/XMLHttpRequest/WebSocket at lint time as a coarse FPD-4 guard (the proper hostname-aware RU-12 custom rule is correctly deferred to unit-12 per file_plan)."
+    },
+    {
+      "check": "fpd_7_mv3_only",
+      "result": "pass",
+      "detail": "manifest_version=3 in both source and dist. No MV2 keys (browser_action, page_action, background.scripts, background.persistent) present."
+    },
+    {
+      "check": "fpd_13_storage_local_only",
+      "result": "pass",
+      "detail": "No chrome.storage.sync references anywhere. Source comments in popup/main.ts and options/main.ts explicitly call out chrome.storage.local-only persistence (FPD-13). 'storage' permission alone is granted in manifest."
+    },
+    {
+      "check": "con_008_no_display_none_for_hide",
+      "result": "n/a",
+      "detail": "Hide-mode executor lands in unit-7. Skeleton contains no executor logic, no CSS targeting display:none, and no hiding action. Not applicable for unit-1."
+    },
+    {
+      "check": "no_invented_product_semantics",
+      "result": "pass",
+      "detail": "Skeleton stubs are empty no-ops. No domain entities (NormalizedDanmakuRecord, NoiseVerdict, ExtensionSettings, FloodWindowEntry) declared, no detector logic, no whitelist logic, no normalization pipeline. The only references to those names are documentation comments stating they 'land in later units'. This correctly respects the empty domain_model/function_contracts/data_contract/ui_contract from the handoff."
+    },
+    {
+      "check": "done_when_dist_manifest_valid",
+      "result": "pass",
+      "detail": "dist/manifest.json is valid MV3 JSON, parsed cleanly, all required keys (manifest_version, name, version, host_permissions, permissions, background.service_worker, content_scripts) present and well-formed."
+    },
+    {
+      "check": "done_when_extension_loads",
+      "result": "deferred_with_evidence",
+      "detail": "Load-Unpacked-in-Chrome step requires GUI and is correctly deferred to /achieve browser_checks (BC-6). Structural prerequisites for a clean load are all satisfied (valid MV3 schema, service-worker-loader generated, content-script bundle generated, popup/options HTML emitted into dist/). Coder flagged this in verification_results; consistent with done_when_results.met=true on the structural verifier check."
+    },
+    {
+      "check": "done_when_sw_cold_start_under_50ms",
+      "result": "deferred_with_evidence",
+      "detail": "Measurement requires chrome://extensions runtime and is correctly deferred to /achieve. SW body is essentially empty (a skipWaiting + no-op activate + module export); the budget should hold. Coder explicitly flagged this in ambiguities; consistent with /code playbook for a non-runtime-measurable criterion."
+    },
+    {
+      "check": "no_forbidden_decisions_violated",
+      "result": "pass",
+      "detail": "Spot-checked all 16 forbidden_decisions: MV3 retained, default actionMode not yet implemented (no default flipped to hide), 5-category requirement unaffected at skeleton stage, no fetch/XHR/WS-write/sendBeacon, no Bilibili report/delete API calls, no chrome.storage.sync, no display:none for hide (no hide path yet), no classifier reordering (no classifier yet), no single-signal whitelist (no whitelist yet), no auto-toxic-allow (no panel yet), PROBATION not removed (not yet introduced), no remote dictionary loading (no dict yet), no political-censorship token shipped (no dict yet), no `?: number` syntax (no entity types yet), no single-store conflation (no settings yet), no DOM-only or WS-only architecture decision (skeleton-only)."
+    },
+    {
+      "check": "engineering_decisions_review",
+      "result": "pass",
+      "detail": "Coder's 7 engineering_decisions are all low-impact wiring choices that preserve the frozen toolchain (DEP-001: vite + @crxjs + typescript + pnpm). Notable: pnpm 9.0.6 installed via `npm install -g pnpm` because pnpm was off PATH — preserves pnpm requirement, not a substitution. tsconfig.lib adds WebWorker for SW types. ESLint no-restricted-globals adds coarse FPD-4 guard. None of these violate forbidden_decisions or contradict frozen_product_decisions."
+    },
+    {
+      "check": "deviations_from_handoff",
+      "result": "pass",
+      "detail": "Two deviations declared, both acceptable: (1) toolchain_install via npm-global is a wiring detail, not a toolchain swap. (2) icons={} empty because handoff did not specify icon assets and inventing icons is outside allowed_decisions. Default Chrome puzzle-piece icon shows in chrome://extensions until a later unit supplies icons. Both deviations are properly flagged and conservative."
+    }
+  ],
+  "summary": "unit-1 PASS. All 13 declared files exist. dist/manifest.json is structurally valid MV3 with permissions=['storage'], host_permissions limited to live.bilibili.com + www.bilibili.com, no webRequestBlocking, no remote code. `pnpm build` reproduces cleanly in 74ms with 72K dist (well under 500KB budget). Zero forbidden patterns in source (no fetch/XHR/WebSocket-write/sendBeacon, no chrome.storage.sync, no display:none, no MV2 keys). Coder did not invent any product semantics: no domain entities, no detector logic, no whitelist, no normalize pipeline — only no-op stubs with comments noting later units. Two done_when items (Load Unpacked + SW cold-start measurement) require Chrome GUI and are correctly deferred to /achieve browser_checks; structural prerequisites are met. Engineering decisions and declared deviations are conservative and within allowed_decisions. No FROZEN constraint violated, no frozen_product_decision contradicted, no acceptance_semantic made unreachable. Ready to proceed to unit-1.5 (RU-01.5 empirical baseline) per execution_chain."
+}

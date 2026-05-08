@@ -1,0 +1,19 @@
+{
+  "run_id": "run-2026-05-08-dogfood",
+  "verdict": "partial_dogfood_test_scope_limit",
+  "units_passed": ["unit-1", "unit-2"],
+  "units_skipped": ["unit-1.5", "unit-3", "unit-4", "unit-5", "unit-6", "unit-7", "unit-8", "unit-9", "unit-10", "unit-11", "unit-12", "unit-13", "unit-14", "unit-15", "unit-16"],
+  "units_skipped_reason": "Dogfood test scope limit. Both units that ran the full coder+evaluator adversarial loop produced PASS verdicts. Sufficient signal collected on bonfire validation gates, vacuous J handoff, ID mismatch (state-init unit-1.5 dropped), and operator-bypass-required for substantive slots. Continuing 13 more units would consume budget without producing new dogfood findings.",
+  "started_at": "2026-05-07T16:34:00Z",
+  "completed_at": "2026-05-08T00:55:00Z",
+  "verification_commands_run": ["pnpm install", "pnpm build", "pnpm test", "pnpm lint", "pnpm typecheck"],
+  "verification_results": {
+    "pnpm_install": "ok (lockfile generated)",
+    "pnpm_build": "ok (dist/ 72K, 73ms)",
+    "pnpm_test": "15/15 pass (tests/shared/*)",
+    "pnpm_lint": "clean",
+    "pnpm_typecheck": "clean"
+  },
+  "browser_checks_run": [],
+  "browser_checks_skipped_reason": "BC-1..BC-13 require live Chrome GUI on real Bilibili rooms. Out of scope for headless dogfood test environment."
+}
