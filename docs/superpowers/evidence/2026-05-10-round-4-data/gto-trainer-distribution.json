@@ -1,0 +1,862 @@
+{
+  "analysis_date": "2026-05-09",
+  "spec_ref": "docs/superpowers/specs/2026-05-04-bonfire-assertion-4-design.md (round-3, invalidated)",
+  "errata_ref": "docs/superpowers/specs/2026-05-04-bonfire-assertion-4-errata-001.md",
+  "source_archive": "/Users/lddmay/AiCoding/bonfire-test/gto-trainer/.bonfire/archive/2026-05-04-gto-trainer-v0.1-dogfood/truth-surface/constraint-ledger-snapshot.json",
+  "raw_handoff_ref": "/Users/lddmay/AiCoding/bonfire/docs/superpowers/evidence/2026-05-06-calibration/raw-output-2026-05-06.json",
+  "scope": "Stage 0a: gto-trainer single-archive distribution extraction with metric class candidates",
+  "invention_keywords": [
+    "board texture",
+    "board textures",
+    "hand-strength tier",
+    "hand strength tier",
+    "hand-strength tiers",
+    "hand strength tiers"
+  ],
+  "invention_chinese_check": "unicode block 4e00-9fff and 3400-4dbf",
+  "total_slots_analyzed": 9,
+  "excluded_count": 2,
+  "excluded": [
+    {
+      "ref": "CON-017",
+      "slot_kind": "domain_entity",
+      "aligned_by": [
+        "g-blue-mitigated-via-CON-026"
+      ],
+      "reason": "transitive paraphrase"
+    },
+    {
+      "ref": "CON-019",
+      "slot_kind": "domain_entity",
+      "aligned_by": [
+        "stage-e-drop-schema-version-via-CON-024",
+        "g-blue-mitigated-via-CON-027"
+      ],
+      "reason": "transitive paraphrase"
+    }
+  ],
+  "outlier_edge_detection": {
+    "avg_adjacent_gap": 4.166666666666667,
+    "outlier_gap_threshold": 6.25,
+    "outlier_values": [
+      35
+    ]
+  },
+  "per_slot": [
+    {
+      "ref": "CON-026",
+      "slot_id": "FC-001",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.4708994708994709,
+      "slot_token_count": 189,
+      "overlap_count": 89,
+      "max_contiguous_orphan_run": 10,
+      "orphan_runs_summary": {
+        "total_runs": 40,
+        "run_lengths": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          1,
+          10,
+          1,
+          6,
+          2,
+          1,
+          6,
+          2,
+          2,
+          3,
+          1,
+          10,
+          1,
+          1,
+          1,
+          1,
+          1,
+          2,
+          1,
+          2,
+          1,
+          5,
+          1,
+          5,
+          3,
+          2,
+          1,
+          2,
+          1,
+          3,
+          4,
+          5,
+          4
+        ],
+        "top_runs": [
+          {
+            "length": 10,
+            "tokens": [
+              "set",
+              "the",
+              "function",
+              "tolerates",
+              "differences"
+            ]
+          },
+          {
+            "length": 10,
+            "tokens": [
+              "are",
+              "always",
+              "in",
+              "one",
+              "consistent"
+            ]
+          },
+          {
+            "length": 6,
+            "tokens": [
+              "when",
+              "the",
+              "input",
+              "cannot",
+              "be"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Provides a pure normalizer that takes any user- or caller-supplied hand-string variant and reduces it to a canonical member of the frozen 169-string HAND_CLASSES set. The function tolerates difference...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-020",
+      "slot_id": "FC-002",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.12429378531073447,
+      "slot_token_count": 177,
+      "overlap_count": 22,
+      "max_contiguous_orphan_run": 25,
+      "orphan_runs_summary": {
+        "total_runs": 20,
+        "run_lengths": [
+          10,
+          1,
+          5,
+          14,
+          8,
+          1,
+          10,
+          4,
+          6,
+          7,
+          3,
+          1,
+          25,
+          3,
+          21,
+          6,
+          2,
+          11,
+          3,
+          14
+        ],
+        "top_runs": [
+          {
+            "length": 25,
+            "tokens": [
+              "always",
+              "matches",
+              "the",
+              "regex",
+              "/^"
+            ]
+          },
+          {
+            "length": 21,
+            "tokens": [
+              "the",
+              "score",
+              "is",
+              "action-in-set",
+              "not"
+            ]
+          },
+          {
+            "length": 14,
+            "tokens": [
+              "raise",
+              "call",
+              "or",
+              "fold",
+              "it"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Implements the scoring contract for a single spot. Given a position, a hand string, and the user's chosen action (Raise, Call, or Fold), it returns a verdict object indicating whether the user was cor...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-034",
+      "slot_id": "FC-003",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.26288659793814434,
+      "slot_token_count": 194,
+      "overlap_count": 51,
+      "max_contiguous_orphan_run": 12,
+      "orphan_runs_summary": {
+        "total_runs": 32,
+        "run_lengths": [
+          6,
+          1,
+          11,
+          2,
+          1,
+          1,
+          3,
+          5,
+          2,
+          2,
+          4,
+          2,
+          6,
+          9,
+          3,
+          8,
+          12,
+          2,
+          1,
+          2,
+          4,
+          4,
+          11,
+          5,
+          4,
+          2,
+          4,
+          5,
+          5,
+          6,
+          2,
+          8
+        ],
+        "top_runs": [
+          {
+            "length": 12,
+            "tokens": [
+              "same",
+              "position",
+              "hand",
+              "pair",
+              "will"
+            ]
+          },
+          {
+            "length": 11,
+            "tokens": [
+              "6",
+              "positions",
+              "×",
+              "169",
+              "hand"
+            ]
+          },
+          {
+            "length": 11,
+            "tokens": [
+              "session",
+              "all",
+              "hand",
+              "strings",
+              "emitted"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Samples a single training spot uniformly at random from the 6 positions × 169 hand classes = 1014-cell space, then enforces within-session uniqueness by keeping a per-session Set keyed by 'position|ha...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-027",
+      "slot_id": "FC-004",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.19806763285024154,
+      "slot_token_count": 207,
+      "overlap_count": 41,
+      "max_contiguous_orphan_run": 27,
+      "orphan_runs_summary": {
+        "total_runs": 33,
+        "run_lengths": [
+          1,
+          2,
+          2,
+          1,
+          12,
+          4,
+          6,
+          4,
+          4,
+          2,
+          5,
+          2,
+          4,
+          1,
+          1,
+          3,
+          1,
+          5,
+          5,
+          5,
+          14,
+          12,
+          27,
+          1,
+          1,
+          3,
+          1,
+          5,
+          3,
+          4,
+          10,
+          11,
+          4
+        ],
+        "top_runs": [
+          {
+            "length": 27,
+            "tokens": [
+              "per-position",
+              "spots",
+              "correct",
+              "sub-objects",
+              "increments"
+            ]
+          },
+          {
+            "length": 14,
+            "tokens": [
+              "object",
+              "with",
+              "the",
+              "same",
+              "schema"
+            ]
+          },
+          {
+            "length": 12,
+            "tokens": [
+              "so",
+              "that",
+              "the",
+              "trainer",
+              "keeps"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Wraps every read from and write to localStorage in defensive try/catch so that the trainer keeps running even when the browser denies storage. On any SecurityError, QuotaExceededError, or JSON.parse f...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-029",
+      "slot_id": "FC-005",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.1893491124260355,
+      "slot_token_count": 169,
+      "overlap_count": 32,
+      "max_contiguous_orphan_run": 23,
+      "orphan_runs_summary": {
+        "total_runs": 24,
+        "run_lengths": [
+          2,
+          4,
+          18,
+          3,
+          3,
+          5,
+          2,
+          5,
+          1,
+          1,
+          7,
+          11,
+          3,
+          13,
+          2,
+          1,
+          6,
+          6,
+          2,
+          1,
+          15,
+          1,
+          23,
+          2
+        ],
+        "top_runs": [
+          {
+            "length": 23,
+            "tokens": [
+              "composition",
+              "the",
+              "gating",
+              "predicates",
+              "prevent"
+            ]
+          },
+          {
+            "length": 18,
+            "tokens": [
+              "button",
+              "while",
+              "staying",
+              "out",
+              "of"
+            ]
+          },
+          {
+            "length": 15,
+            "tokens": [
+              "just",
+              "the",
+              "button",
+              "path",
+              "as"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Routes single-letter R/C/F keystrokes to the corresponding action button while staying out of the way when the user is mid-IME composition. The handler only acts when event.isComposing is false, event...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-036",
+      "slot_id": "FC-006",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.33163265306122447,
+      "slot_token_count": 196,
+      "overlap_count": 65,
+      "max_contiguous_orphan_run": 12,
+      "orphan_runs_summary": {
+        "total_runs": 37,
+        "run_lengths": [
+          4,
+          2,
+          2,
+          6,
+          3,
+          1,
+          12,
+          3,
+          6,
+          1,
+          1,
+          1,
+          5,
+          7,
+          3,
+          7,
+          3,
+          1,
+          1,
+          6,
+          6,
+          2,
+          5,
+          2,
+          6,
+          2,
+          4,
+          1,
+          2,
+          1,
+          7,
+          2,
+          1,
+          3,
+          3,
+          7,
+          2
+        ],
+        "top_runs": [
+          {
+            "length": 12,
+            "tokens": [
+              "count",
+              "exactly",
+              "six",
+              "positions",
+              "if"
+            ]
+          },
+          {
+            "length": 7,
+            "tokens": [
+              "sequence",
+              "the",
+              "intent",
+              "is",
+              "that"
+            ]
+          },
+          {
+            "length": 7,
+            "tokens": [
+              "diagnostic",
+              "instead",
+              "of",
+              "a",
+              "silent"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Runs as the very first step of main.js initialization, before any session state is constructed. It verifies that window.RANGES is a non-null object whose keys count exactly six positions; if any check...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-030",
+      "slot_id": "FC-007",
+      "slot_kind": "function_contract",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.3870967741935484,
+      "slot_token_count": 186,
+      "overlap_count": 72,
+      "max_contiguous_orphan_run": 23,
+      "orphan_runs_summary": {
+        "total_runs": 38,
+        "run_lengths": [
+          3,
+          4,
+          1,
+          2,
+          2,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          3,
+          6,
+          6,
+          1,
+          2,
+          2,
+          2,
+          23,
+          1,
+          1,
+          2,
+          3,
+          2,
+          1,
+          3,
+          3,
+          4,
+          1,
+          2,
+          3,
+          2,
+          1,
+          2,
+          4,
+          3,
+          5,
+          8
+        ],
+        "top_runs": [
+          {
+            "length": 23,
+            "tokens": [
+              "edit",
+              "a",
+              "cell",
+              "which",
+              "converts"
+            ]
+          },
+          {
+            "length": 8,
+            "tokens": [
+              "fails",
+              "because",
+              "the",
+              "recomputed",
+              "digest"
+            ]
+          },
+          {
+            "length": 6,
+            "tokens": [
+              "the",
+              "digest",
+              "from",
+              "the",
+              "live"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "Backs the data-integrity guard for the range table. ranges.js terminates with a line of the form window.RANGES_SHA256 = '<64-hex>' where the hex digest is the sha256 of canonical JSON.stringify(window...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-035",
+      "slot_id": "PANEL-001",
+      "slot_kind": "ui_panel",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.14659685863874344,
+      "slot_token_count": 191,
+      "overlap_count": 28,
+      "max_contiguous_orphan_run": 19,
+      "orphan_runs_summary": {
+        "total_runs": 23,
+        "run_lengths": [
+          6,
+          4,
+          5,
+          1,
+          1,
+          3,
+          12,
+          3,
+          2,
+          9,
+          7,
+          5,
+          2,
+          6,
+          7,
+          3,
+          12,
+          16,
+          13,
+          19,
+          5,
+          5,
+          17
+        ],
+        "top_runs": [
+          {
+            "length": 19,
+            "tokens": [
+              "displays",
+              "a",
+              "placeholder",
+              "rather",
+              "than"
+            ]
+          },
+          {
+            "length": 17,
+            "tokens": [
+              "its",
+              "own",
+              "correct",
+              "rate",
+              "alongside"
+            ]
+          },
+          {
+            "length": 16,
+            "tokens": [
+              "spots",
+              "before",
+              "its",
+              "rate",
+              "is"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "An aggregate dashboard that summarizes performance across every session ever recorded in localStorage on this browser. Unlike the per-session-end panel — which only reports overall correct/30 because ...",
+      "outlier_edge": false
+    },
+    {
+      "ref": "CON-036",
+      "slot_id": "PANEL-002",
+      "slot_kind": "ui_panel",
+      "class_tag": "legit-paraphrase",
+      "invention_signal": {
+        "is_invention": false,
+        "matched_keywords": []
+      },
+      "overlap_ratio": 0.1457286432160804,
+      "slot_token_count": 199,
+      "overlap_count": 29,
+      "max_contiguous_orphan_run": 35,
+      "orphan_runs_summary": {
+        "total_runs": 18,
+        "run_lengths": [
+          11,
+          15,
+          5,
+          2,
+          7,
+          3,
+          10,
+          1,
+          4,
+          9,
+          35,
+          5,
+          6,
+          1,
+          3,
+          7,
+          21,
+          25
+        ],
+        "top_runs": [
+          {
+            "length": 35,
+            "tokens": [
+              "top",
+              "with",
+              "ime-safe",
+              "gating",
+              "current"
+            ]
+          },
+          {
+            "length": 25,
+            "tokens": [
+              "a",
+              "混合策略",
+              "tag",
+              "when",
+              "expected"
+            ]
+          },
+          {
+            "length": 21,
+            "tokens": [
+              "the",
+              "user",
+              "has",
+              "not",
+              "yet"
+            ]
+          }
+        ]
+      },
+      "slot_text_preview": "The primary panel that shows the current spot to the user and houses the Raise / Call / Fold action buttons. It is also the failure-surface for boot problems: when bootGuard detects that window.RANGES...",
+      "outlier_edge": true
+    }
+  ],
+  "distributions": {
+    "legit_paraphrase": {
+      "slot_count": 9,
+      "max_contiguous_orphan_run": {
+        "count": 9,
+        "min": 10,
+        "max": 35,
+        "p5": 10,
+        "p25": 12,
+        "median": 23,
+        "p75": 25,
+        "p95": 35,
+        "mean": 20.67,
+        "iqr": 13
+      },
+      "overlap_ratio": {
+        "count": 9,
+        "min": 0.12429378531073447,
+        "max": 0.4708994708994709,
+        "p5": 0.12429378531073447,
+        "p25": 0.14659685863874344,
+        "median": 0.19806763285024154,
+        "p75": 0.33163265306122447,
+        "p95": 0.4708994708994709,
+        "mean": 0.25,
+        "iqr": 0.18503579442248103
+      }
+    },
+    "invention": {
+      "slot_count": 0,
+      "max_contiguous_orphan_run": {
+        "count": 0,
+        "min": null,
+        "max": null,
+        "median": null,
+        "mean": null
+      },
+      "overlap_ratio": {
+        "count": 0,
+        "min": null,
+        "max": null,
+        "median": null,
+        "mean": null
+      }
+    },
+    "all_slots": {
+      "slot_count": 9,
+      "max_contiguous_orphan_run": {
+        "count": 9,
+        "min": 10,
+        "max": 35,
+        "p5": 10,
+        "p25": 12,
+        "median": 23,
+        "p75": 25,
+        "p95": 35,
+        "mean": 20.67,
+        "iqr": 13
+      },
+      "overlap_ratio": {
+        "count": 9,
+        "min": 0.12429378531073447,
+        "max": 0.4708994708994709,
+        "p5": 0.12429378531073447,
+        "p25": 0.14659685863874344,
+        "median": 0.19806763285024154,
+        "p75": 0.33163265306122447,
+        "p95": 0.4708994708994709,
+        "mean": 0.25,
+        "iqr": 0.18503579442248103
+      }
+    }
+  }
+}
