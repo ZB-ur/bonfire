@@ -9,6 +9,8 @@
       "panels": {
         "Home": {
           "description": "开始训练 和 重置统计",
+          "elements": "开始训练",
+          "states": "重置统计",
           "source_kind": "condition_rewrite",
           "source_ref": { "condition_index": 0 }
         }

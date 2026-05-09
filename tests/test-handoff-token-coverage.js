@@ -23,12 +23,13 @@ function mkContext(opts = {}) {
 }
 
 test('Layer 2b: slot with all tokens in source passes', () => {
+  // Schema v2: required_subfields=["name","fields"] for entities. `notes` is no longer walked.
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
-          fields: { rank: 'Rank', suit: 'Suit' },
-          notes: 'card model rank suit',
+          name: 'Card model',
+          fields: 'rank suit',
           source_kind: 'ledger_direct',
           source_ref: 'CON-013',
         },
@@ -43,12 +44,17 @@ test('Layer 2b: slot with all tokens in source passes', () => {
 });
 
 test('Layer 2b: slot with orphan token fails', () => {
+  // Schema v2: required_subfields=["name","fields"] for domain_model.entities.
+  // Orphan tokens must live in a substantive subfield to be checked. Pre-v2
+  // this test put orphans in `notes` (which v1 walked because no `fields`
+  // filter was declared); v2 restricts walking to required_subfields, so
+  // orphans now go into `name`.
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
+          name: 'Card model with rank suit monte-carlo simulator',
           fields: { rank: 'Rank', suit: 'Suit' },
-          notes: 'card model rank suit monte-carlo simulator',
           source_kind: 'ledger_direct',
           source_ref: 'CON-013',
         },
@@ -68,8 +74,8 @@ test('Layer 2b: condition_rewrite — tokens must come from condition text', () 
     domain_model: {
       entities: {
         Card: {
-          fields: {},
-          notes: 'card rendered in given when then format',
+          name: 'Card render given when then format',
+          fields: 'render',
           source_kind: 'condition_rewrite',
           source_ref: { condition_index: 0 },
         },
@@ -88,12 +94,14 @@ test('Layer 2b: condition_rewrite — tokens must come from condition text', () 
 });
 
 test('Layer 2b: condition_rewrite with new token not in condition fails', () => {
+  // Schema v2: orphans must be in a substantive subfield (name/fields) per
+  // required_subfields. Moved from `notes` to `name` to reflect v2 walk semantics.
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
+          name: 'Card with fancy holographic rendering',
           fields: {},
-          notes: 'card with fancy holographic rendering',
           source_kind: 'condition_rewrite',
           source_ref: { condition_index: 0 },
         },
@@ -113,11 +121,14 @@ test('Layer 2b: condition_rewrite with new token not in condition fails', () => 
 });
 
 test('Layer 2b: CJK literal match — Chinese slot with Chinese source passes', () => {
+  // Schema v2: ui_contract.panels.required_subfields=["description","elements","states"]
   const co = mkCompileOutput({
     ui_contract: {
       panels: {
         Home: {
           description: '开始 训练',
+          elements: '开始',
+          states: '训练',
           source_kind: 'condition_rewrite',
           source_ref: { condition_index: 0 },
         },
@@ -141,6 +152,8 @@ test('Layer 2b: CJK literal match — slot CJK not in source → orphan', () => 
       panels: {
         Home: {
           description: '设置',  // not in source
+          elements: '开始',
+          states: '训练',
           source_kind: 'condition_rewrite',
           source_ref: { condition_index: 0 },
         },
@@ -159,12 +172,13 @@ test('Layer 2b: CJK literal match — slot CJK not in source → orphan', () => 
 });
 
 test('Layer 2b: lemmatization — plural slot matches singular source', () => {
+  // Schema v2: substantive content in name + fields. Tokens: cards, suits, ranks (plural).
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
-          fields: {},
-          notes: 'cards with suits and ranks',
+          name: 'Cards with suits and ranks',
+          fields: 'cards',
           source_kind: 'ledger_direct',
           source_ref: 'CON-013',
         },

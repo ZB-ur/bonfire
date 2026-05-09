@@ -469,6 +469,8 @@ test('E2E: clean H→J flow — valid stage-j condition, provenance handoff, all
           panels: {
             Showdown: {
               description: 'Given user placed bet When showdown occurs Then user sees winning hand',
+              elements: 'showdown',
+              states: 'showdown',
               source_kind: 'condition_rewrite',
               source_ref: { condition_index: 0 },
             },
