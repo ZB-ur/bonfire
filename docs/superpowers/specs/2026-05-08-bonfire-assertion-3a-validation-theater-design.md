@@ -314,11 +314,13 @@ This location covers three contiguous top-level edits in `bonfire-v1.json`. Plan
 
 *1a — New shared ledger ID constants (DQ-4 close):*
 ```diff
-+"ledger_id_prefixes": ["CON", "RG", "FC", "AS", "REQ", "RISK", "DEP", "FACT", "CLAIM", "DROP"],
-+"ledger_id_pattern": "(?:CON|RG|FC|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
++"ledger_id_prefixes": ["CON", "RG", "FC", "AS", "ACC", "REQ", "RISK", "DEP", "FACT", "CLAIM", "DROP"],
++"ledger_id_pattern": "(?:CON|RG|FC|AS|ACC|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
 ```
 
 The validator helper `validateLedgerRef(value, schema)` (Section 6.7) reads `schema.ledger_id_pattern` and uses it for any field declaring `*_constraint: "ledger_ref"`. Per-location pattern duplication is removed; future ledger ID prefix additions touch a single line.
+
+**ACC prefix history (added 2026-05-09 during 3a Phase 3 implementation):** Original Task 2 prefix list had 10 entries and omitted `ACC`. Phase 3's new `ruling_item_shape.id_constraint: "ledger_ref"` enforcement surfaced pre-existing schema-doc drift: `tests/test-state-advance-invariants.js:245` (gto-trainer regression fixture from commit f6ef678) used `ACC-001` for an `acceptance_semantic` ledger entry, but the schema regex did not accept it. ACC was formalized into the prefix list to make the regression fixture pass under the new enforcement. Both `AS` and `ACC` are retained pending Assertion 3b (schema-doc drift spec) canonicalization decision — which of `AS` or `ACC` is the canonical `acceptance_semantic` prefix is out-of-scope for 3a; the immediate goal is to not break existing fixtures while 3a's substantive-content checks ship.
 
 *1b — `handoff_mandate_params` escape valve refactored to use shared constraint (line 243-248, DQ-4 close):*
 ```diff
