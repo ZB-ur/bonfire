@@ -327,3 +327,47 @@ test('compareTokens: empty slot tokens → no orphans', () => {
   const orphans = compareTokens([], 'anything');
   assert.deepEqual(orphans, []);
 });
+
+// ---------------------------------------------------------------------------
+// maxContiguousOrphanRun — Round-4 Layer 2b metric (per spec §5)
+// ---------------------------------------------------------------------------
+
+const { maxContiguousOrphanRun } = require('../bin/lib/seam-validation.cjs');
+
+test('maxContiguousOrphanRun returns 0 for empty slot tokens', () => {
+  assert.equal(maxContiguousOrphanRun([], 'source text'), 0);
+});
+
+test('maxContiguousOrphanRun returns 0 when all slot tokens overlap source', () => {
+  assert.equal(maxContiguousOrphanRun(['hello', 'world'], 'hello world'), 0);
+});
+
+test('maxContiguousOrphanRun returns slot length when all tokens are orphans', () => {
+  assert.equal(maxContiguousOrphanRun(['foo', 'bar', 'baz'], 'unrelated text'), 3);
+});
+
+test('maxContiguousOrphanRun handles mixed sequence — single 3-token burst', () => {
+  // slot tokens: [in, source, foo, bar, baz, in]; orphans: foo, bar, baz (3 contiguous)
+  assert.equal(maxContiguousOrphanRun(['in', 'source', 'foo', 'bar', 'baz', 'in'], 'in source'), 3);
+});
+
+test('maxContiguousOrphanRun resets run counter on overlap token', () => {
+  // [foo, bar, in, baz, qux] orphans: foo bar (run 2), baz qux (run 2); max=2
+  assert.equal(maxContiguousOrphanRun(['foo', 'bar', 'in', 'baz', 'qux'], 'in'), 2);
+});
+
+test('maxContiguousOrphanRun ignores CON-* refs (no run extension, no run reset)', () => {
+  // [foo, CON-001, bar] — CON-001 ignored; foo + bar are not adjacent in run
+  // (CON-* breaks run by skipping; so run counts: foo (run=1), CON-001 reset, bar (run=1))
+  // → max=1
+  assert.equal(maxContiguousOrphanRun(['foo', 'CON-001', 'bar'], 'unrelated'), 1);
+});
+
+test('maxContiguousOrphanRun is case-insensitive on CON-* refs', () => {
+  assert.equal(maxContiguousOrphanRun(['foo', 'con-002', 'bar'], 'unrelated'), 1);
+});
+
+test('maxContiguousOrphanRun selects the LONGER of multiple orphan runs', () => {
+  // slot: [a, b, c, in, d, e, f, g, h, in, i] — orphan runs: 3 (abc), 5 (defgh), 1 (i)
+  assert.equal(maxContiguousOrphanRun(['a', 'b', 'c', 'in', 'd', 'e', 'f', 'g', 'h', 'in', 'i'], 'in'), 5);
+});

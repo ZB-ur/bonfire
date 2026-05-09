@@ -311,6 +311,50 @@ function classifyAlignedByToken(token) {
 }
 
 // ---------------------------------------------------------------------------
+// maxContiguousOrphanRun — Layer 2b round-4 metric (per ASSERTION-4 round-4
+// spec §5). Computes the longest contiguous run of orphan tokens in slot
+// (i.e., tokens NOT present in source content tokens), preserving slot
+// token order. CON-* refs reset the current run (breaks contiguous orphan
+// sequence) per spec §5 pseudocode. Round-4 primary reject_when metric.
+//
+// Orphan = slot token not in extractSubstantiveTokens(sourceText) bag.
+//
+// Per spec §5 (raw comparison; NOT lemmatization): membership check uses
+// raw extractSubstantiveTokens output without lemma stemming. This anchors
+// to Stage 0 calibration baseline (gto-trainer 9-slot corpus computed
+// without lemma; CON-036 max_run=35 per docs/superpowers/evidence/
+// 2026-05-10-round-4-data/gto-trainer-distribution.json). compareTokens
+// (PR #2 Layer 2b foundation) applies lemmatization for binary
+// orphans-presence reject; round-4's threshold metric uses raw to preserve
+// Stage 0 calibration validity. Spec amendment required if future evidence
+// shows lemma-aware metric improves discrimination (per Q5 §6.4 trigger).
+// ---------------------------------------------------------------------------
+function maxContiguousOrphanRun(slotTokens, sourceText) {
+  const sourceTokens = extractSubstantiveTokens(sourceText || '');
+  const sourceSet = new Set(sourceTokens);
+  let maxRun = 0;
+  let currentRun = 0;
+  for (const raw of (slotTokens || [])) {
+    const tok = (raw || '').toString().toLowerCase();
+    if (/^con-\d+$/i.test(tok)) {
+      // CON-* refs: reset current run per spec §5 pseudocode (orphan_run = 0;
+      // continue). Equivalent to a "gap" in the slot token sequence — CON-*
+      // is scaffolding, not orphan content, so it terminates any preceding
+      // orphan run.
+      currentRun = 0;
+      continue;
+    }
+    if (sourceSet.has(tok)) {
+      currentRun = 0;
+    } else {
+      currentRun += 1;
+      if (currentRun > maxRun) maxRun = currentRun;
+    }
+  }
+  return maxRun;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -323,6 +367,7 @@ module.exports = {
   PARAPHRASE_PATTERNS,
   validateHConditions,
   compareTokens,
+  maxContiguousOrphanRun,
   classifyAlignedByToken,
   ALIGNED_BY_FALSE_POSITIVE_WHITELIST,
 };
