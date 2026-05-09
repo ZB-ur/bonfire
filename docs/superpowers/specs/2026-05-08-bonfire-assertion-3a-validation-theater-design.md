@@ -563,9 +563,10 @@ New adversarial fixtures added to `tests/fixtures/hj-seam-adversarial/` covering
 **Existing 10 fixtures in `tests/fixtures/hj-seam-adversarial/` (PR #2)** — all must continue to produce their existing expected results. No new false positives. No previously-rejecting fixture passes due to 3a's introduction.
 
 **Dogfood archive replay (read-only verification):**
-- `docs/superpowers/evidence/2026-05-04-gto-trainer-v0.1-dogfood/.bonfire/plan/compile-output.json` (or equivalent path) replayed through the new `handoff-validate` — **must reject** with deep_check_failed if and only if the original archive's handoff exhibits the L2a vacuous-pass pattern (per gto-trainer finding #1).
 - `docs/superpowers/evidence/2026-05-08-bilibili-danmaku-clean/.bonfire/plan/compile-output.json` replayed through new `handoff-validate` — **must reject** with deep_check_failed (verifies B2 reproduction).
 - `docs/superpowers/evidence/2026-05-08-bilibili-danmaku-clean/.bonfire/plan/h-review-verdict.json` replayed through new `state-advance --step stage-h` (in a sandboxed harness — not live state mutation) — **must reject** with `verdict_substantive_check` rule match (verifies B1 reproduction).
+
+**Note on gto-trainer archive (excluded from Phase 5 replay scope):** The gto-trainer 2026-05-04 dogfood archive lives at `bonfire-test/gto-trainer/.bonfire/archive/2026-05-04-gto-trainer-v0.1-dogfood/` (external to this repo, not under `docs/superpowers/evidence/`). Per `dogfood-2026-05-04-findings.md` finding #1, the dominant pattern in that archive is Layer 2b prose token-coverage false-positive (Assertion 4 territory) rather than L2a vacuous-pass. While Section 2 cites it as "B2 ASSERTION-4 candidate also touches this surface from a different angle", the L2a vacuous-pass aspect is fully reproduced by the bilibili-clean archive replay above. Importing gto-trainer archive purely to satisfy a regression-matrix spec reference is YAGNI: bilibili-clean provides concrete B1+B2 acceptance; 10 existing hj-seam-adversarial fixtures provide breadth coverage; gto-trainer regression value is reserved for Assertion 4 round-4 work where Layer 2b is the focus surface.
 
 This regression matrix gives concrete acceptance for "3a closes the dogfood-evidenced surface" without requiring meta-circular self-application semantics.
 
@@ -636,10 +637,11 @@ Suggested task breakdown for plan-phase. Three schema locations + one shared hel
 - Depends on: Task 1, Task 3 (per-element check feeds top-level predicate).
 
 **Task 5 — Class C regression matrix.**
-- Replay gto-trainer + bilibili-clean dogfood archives through new validators (sandboxed; not live state mutation).
+- Replay bilibili-clean dogfood archive through new validators (sandboxed; not live state mutation). Two replay items: `compile-output.json` for B2 reproduction via `handoff-validate`, `h-review-verdict.json` for B1 reproduction via `state-advance --step stage-h`.
 - Verify expected reject behavior on B1/B2 reproductions.
 - Verify existing 10 hj-seam-adversarial fixtures unchanged.
 - Document evidence-path harness for future regression.
+- gto-trainer archive excluded per §7.3 amendment 2026-05-09 (external location + dominant pattern is Layer 2b territory; bilibili-clean covers L2a vacuous-pass scope).
 - Depends on: Tasks 2, 3, 4 complete.
 
 **Task 6 — Documentation.**
