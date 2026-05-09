@@ -53,23 +53,23 @@ function readHistory(dir) {
 test('apply-h-rulings freezes all targets on happy path', () => {
   const dir = makeTmpDir();
   try {
-    for (const id of ['CON-A', 'CON-B', 'CON-C']) {
+    for (const id of ['CON-001', 'CON-002', 'CON-003']) {
       execFileSync('node', [CLI, 'truth-propose',
         '--id', id, '--category', 'retained_goal',
         '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
         { encoding: 'utf8', cwd: dir });
     }
     writeVerdict(dir, [
-      { action: 'freeze', id: 'CON-A' },
-      { action: 'freeze', id: 'CON-B' },
-      { action: 'freeze', id: 'CON-C' },
+      { action: 'freeze', id: 'CON-001' },
+      { action: 'freeze', id: 'CON-002' },
+      { action: 'freeze', id: 'CON-003' },
     ]);
 
     const result = runApply(dir);
     assert.equal(result.code, 0);
 
     const snap = readSnapshot(dir);
-    for (const id of ['CON-A', 'CON-B', 'CON-C']) {
+    for (const id of ['CON-001', 'CON-002', 'CON-003']) {
       assert.equal(snap.entries[id].status, 'FROZEN');
     }
   } finally {
@@ -81,21 +81,21 @@ test('apply-h-rulings auto-aligns targets with empty challenged_by', () => {
   const dir = makeTmpDir();
   try {
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-X', '--category', 'retained_goal',
+      '--id', 'CON-010', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-X' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-010' }]);
 
     const result = runApply(dir);
     assert.equal(result.code, 0);
 
     const snap = readSnapshot(dir);
-    assert.equal(snap.entries['CON-X'].status, 'FROZEN');
-    assert.deepEqual(snap.entries['CON-X'].aligned_by, ['stage-h-ruling']);
+    assert.equal(snap.entries['CON-010'].status, 'FROZEN');
+    assert.deepEqual(snap.entries['CON-010'].aligned_by, ['stage-h-ruling']);
 
     // History should have update-then-freeze ordering.
     const history = readHistory(dir);
-    const xEvents = history.filter(e => e.id === 'CON-X' && e.type !== 'propose');
+    const xEvents = history.filter(e => e.id === 'CON-010' && e.type !== 'propose');
     assert.equal(xEvents[0].type, 'update');
     assert.equal(xEvents[0].field, 'aligned_by');
     assert.equal(xEvents[0].value, 'stage-h-ruling');
@@ -109,19 +109,19 @@ test('apply-h-rulings appends (not replaces) when aligned_by is pre-populated', 
   const dir = makeTmpDir();
   try {
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-Y', '--category', 'frozen_constraint',
+      '--id', 'CON-020', '--category', 'frozen_constraint',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
     execFileSync('node', [CLI, 'truth-update',
-      '--id', 'CON-Y', '--field', 'aligned_by', '--value', 'g-blue'],
+      '--id', 'CON-020', '--field', 'aligned_by', '--value', 'g-blue'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-Y' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-020' }]);
 
     const result = runApply(dir);
     assert.equal(result.code, 0);
 
     const snap = readSnapshot(dir);
-    assert.deepEqual(snap.entries['CON-Y'].aligned_by, ['g-blue', 'stage-h-ruling']);
+    assert.deepEqual(snap.entries['CON-020'].aligned_by, ['g-blue', 'stage-h-ruling']);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
@@ -131,21 +131,21 @@ test('apply-h-rulings is idempotent: already-FROZEN target skipped, exit 0', () 
   const dir = makeTmpDir();
   try {
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-Z', '--category', 'retained_goal',
+      '--id', 'CON-030', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
       { encoding: 'utf8', cwd: dir });
     execFileSync('node', [CLI, 'truth-update',
-      '--id', 'CON-Z', '--field', 'challenged_by', '--value', 'd-critique'],
+      '--id', 'CON-030', '--field', 'challenged_by', '--value', 'd-critique'],
       { encoding: 'utf8', cwd: dir });
-    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-Z'],
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-030'],
       { encoding: 'utf8', cwd: dir });
 
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-Z' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-030' }]);
     const result = runApply(dir);
     assert.equal(result.code, 0);
 
     const snap = readSnapshot(dir);
-    assert.equal(snap.entries['CON-Z'].status, 'FROZEN');
+    assert.equal(snap.entries['CON-030'].status, 'FROZEN');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
@@ -155,15 +155,15 @@ test('apply-h-rulings is atomic: nonexistent id fails pre-validation, no events 
   const dir = makeTmpDir();
   try {
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-REAL', '--category', 'retained_goal',
+      '--id', 'CON-040', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
       { encoding: 'utf8', cwd: dir });
 
     const historyBefore = readHistory(dir).length;
 
     writeVerdict(dir, [
-      { action: 'freeze', id: 'CON-REAL' },
-      { action: 'freeze', id: 'CON-GHOST' },
+      { action: 'freeze', id: 'CON-040' },
+      { action: 'freeze', id: 'CON-999' },
     ]);
     const result = runApply(dir);
     assert.notEqual(result.code, 0);
@@ -172,7 +172,7 @@ test('apply-h-rulings is atomic: nonexistent id fails pre-validation, no events 
     assert.equal(historyAfter, historyBefore, 'no events should have been appended');
 
     const snap = readSnapshot(dir);
-    assert.equal(snap.entries['CON-REAL'].status, 'PROPOSED', 'real target untouched');
+    assert.equal(snap.entries['CON-040'].status, 'PROPOSED', 'real target untouched');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
@@ -208,13 +208,13 @@ test('apply-h-rulings fails pre-validation for can_freeze=false categories witho
   try {
     // high_impact_risk has can_freeze: false in the schema
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'RISK-NO-FREEZE', '--category', 'high_impact_risk',
+      '--id', 'RISK-001', '--category', 'high_impact_risk',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-a'],
       { encoding: 'utf8', cwd: dir });
 
     const historyBefore = readHistory(dir).length;
 
-    writeVerdict(dir, [{ action: 'freeze', id: 'RISK-NO-FREEZE' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'RISK-001' }]);
     const result = runApply(dir);
     assert.notEqual(result.code, 0, 'should fail pre-validation');
 
@@ -222,8 +222,8 @@ test('apply-h-rulings fails pre-validation for can_freeze=false categories witho
     assert.equal(historyAfter, historyBefore, 'no events should have been appended (including no stray aligned_by update)');
 
     const snap = readSnapshot(dir);
-    assert.equal(snap.entries['RISK-NO-FREEZE'].status, 'OPEN', 'risk entry unchanged');
-    assert.deepEqual(snap.entries['RISK-NO-FREEZE'].aligned_by, [], 'no auto-alignment leaked through');
+    assert.equal(snap.entries['RISK-001'].status, 'OPEN', 'risk entry unchanged');
+    assert.deepEqual(snap.entries['RISK-001'].aligned_by, [], 'no auto-alignment leaked through');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

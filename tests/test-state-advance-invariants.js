@@ -131,15 +131,15 @@ test('state-advance from stage-h blocks when rulings are unsatisfied', () => {
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-UNSAT', '--category', 'retained_goal',
+      '--id', 'CON-100', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-UNSAT' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-100' }]);
 
     const result = runAdvance(dir, 'stage-h');
     assert.notEqual(result.code, 0);
     const out = result.stdout + result.stderr;
-    assert.match(out, /CON-UNSAT/);
+    assert.match(out, /CON-100/);
     assert.match(out, /expected=FROZEN/);
     assert.match(out, /actual=PROPOSED/);
     assert.match(out, /apply-h-rulings/);
@@ -153,10 +153,10 @@ test('state-advance from stage-h allows when all rulings satisfied by apply-h-ru
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-APPLIED', '--category', 'retained_goal',
+      '--id', 'CON-200', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-APPLIED' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-200' }]);
     execFileSync('node', [CLI, 'apply-h-rulings'], { encoding: 'utf8', cwd: dir });
 
     const result = runAdvance(dir, 'stage-h');
@@ -184,16 +184,16 @@ test('state-advance from stage-h allows when ruling is redundant (target already
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-PRE', '--category', 'retained_goal',
+      '--id', 'CON-300', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
     execFileSync('node', [CLI, 'truth-update',
-      '--id', 'CON-PRE', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      '--id', 'CON-300', '--field', 'aligned_by', '--value', 'stage-g-survival'],
       { encoding: 'utf8', cwd: dir });
-    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-PRE'],
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-300'],
       { encoding: 'utf8', cwd: dir });
 
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-PRE' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-300' }]);
     // No apply-h-rulings — target was already frozen by stage-g.
 
     const result = runAdvance(dir, 'stage-h');

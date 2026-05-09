@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "ledger_id_prefixes": ["CON", "RG", "FC", "AS", "REQ", "RISK", "DEP", "FACT", "CLAIM", "DROP"],
-  "ledger_id_pattern": "(?:CON|RG|FC|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
+  "ledger_id_prefixes": ["CON", "RG", "FC", "AS", "ACC", "REQ", "RISK", "DEP", "FACT", "CLAIM", "DROP"],
+  "ledger_id_pattern": "(?:CON|RG|FC|AS|ACC|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
   "notes": [
     {
       "id": "overview",
@@ -274,9 +274,25 @@
         "condition_item_shape": {
           "type": "object",
           "required_fields": ["text", "target_stage"],
-          "target_stage_enum": ["stage-j"]
+          "target_stage_enum": ["stage-j"],
+          "field_substantive_check": {
+            "text": { "isEmptyOrPlaceholder": false }
+          }
         },
-        "ruling_action_enum": ["freeze", "supersede"]
+        "ruling_action_enum": ["freeze", "supersede"],
+        "ruling_item_shape": {
+          "type": "object",
+          "required_fields": ["action", "id"],
+          "id_constraint": "ledger_ref",
+          "action_specific_required_fields": {
+            "freeze": [],
+            "supersede": ["new_content"]
+          },
+          "field_substantive_check": {
+            "id": { "isEmptyOrPlaceholder": false },
+            "new_content": { "isEmptyOrPlaceholder": false, "applies_when_action": "supersede" }
+          }
+        }
       }
     },
     "bonfire-evaluator": {
