@@ -235,6 +235,35 @@
     "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["surfaces", "messaging"] },
     "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["error_map"] }
   },
+  "verdict_substantive_check": {
+    "version": 1,
+    "applies_to": "delta_schemas.bonfire-h-review",
+    "reject_when": [
+      {
+        "rule": "approved_with_conditions_requires_conditions",
+        "predicate": {
+          "verdict": "approved_with_conditions",
+          "conditions_empty": true
+        },
+        "escape_allowed": false
+      },
+      {
+        "rule": "approved_requires_substantive_oversight_or_escape",
+        "predicate": {
+          "verdict": ["approved", "approved_with_conditions"],
+          "conditions_empty": true,
+          "rulings_empty": true
+        },
+        "escape_allowed": true
+      }
+    ],
+    "escape_valve": {
+      "flag": "no_substantive_oversight",
+      "reason_field": "no_substantive_oversight_reason",
+      "reason_ref_constraint": "ledger_ref",
+      "min_refs": 1
+    }
+  },
   "handoff_mandate_params": {
     "ref_field": "substantive_slot_refs",
     "concrete_ref_patterns": [

@@ -167,10 +167,30 @@ test('state-advance from stage-h allows when all rulings satisfied by apply-h-ru
 });
 
 test('state-advance from stage-h allows when verdict has empty rulings', () => {
+  // 3a: empty rulings + empty conditions requires no_substantive_oversight escape valve
+  // with a resolving ledger ref. Create a minimal FROZEN snapshot + escape verdict.
   const dir = makeTmpDir();
   try {
     setPipelineToStageH(dir);
-    writeVerdict(dir, []);
+    // Write a FROZEN snapshot entry so the escape valve ref resolves
+    const snapshotPath = path.join(dir, '.bonfire', 'truth-surface', 'constraint-ledger-snapshot.json');
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+    fs.writeFileSync(snapshotPath, JSON.stringify({
+      version: 1, replayed_at: '2026-05-09T00:00:00Z', event_count: 1,
+      entries: { 'CON-001': { id: 'CON-001', category: 'retained_goal', status: 'FROZEN', content: 'x', rationale: 'r', challenged_by: [], aligned_by: [], evidence_refs: [], notes: [] } },
+      by_status: { proposed: [], challenged: [], frozen: ['CON-001'], superseded: [], open: [], discarded: [] },
+      by_category: { retained_goal: ['CON-001'] },
+    }, null, 2));
+    // Use escape valve to satisfy 3a; rulings still empty so rulings invariant is trivial-pass
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({
+      verdict: 'approved',
+      reason: 'test — no rulings needed',
+      rulings: [],
+      no_substantive_oversight: true,
+      no_substantive_oversight_reason: 'All entries FROZEN. See CON-001.',
+    }, null, 2));
 
     const result = runAdvance(dir, 'stage-h');
     assert.equal(result.code, 0);

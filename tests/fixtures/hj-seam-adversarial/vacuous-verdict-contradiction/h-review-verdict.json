@@ -1,0 +1,7 @@
+{
+  "agent": "bonfire-h-review",
+  "verdict": "approved_with_conditions",
+  "reason": "review complete",
+  "conditions": [],
+  "rulings": [{ "action": "freeze", "id": "CON-001" }]
+}

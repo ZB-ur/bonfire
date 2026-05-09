@@ -158,11 +158,27 @@ test('state-advance past stage-a sets approval', () => {
 });
 
 function writeEmptyHVerdict(dir) {
-  // Stage-h invariant requires verdict to exist; empty rulings → trivial pass.
+  // Stage-h invariant requires verdict to exist.
+  // 3a verdict_substantive_check (Assertion 3a §6.4): approved + empty conditions/rulings
+  // requires the no_substantive_oversight escape valve with a resolving ledger ref.
+  // Provide a minimal FROZEN snapshot so the ref resolves.
+  const snapshotPath = path.join(dir, '.bonfire', 'truth-surface', 'constraint-ledger-snapshot.json');
+  fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+  fs.writeFileSync(snapshotPath, JSON.stringify({
+    version: 1, replayed_at: '2026-05-09T00:00:00Z', event_count: 1,
+    entries: { 'CON-001': { id: 'CON-001', category: 'retained_goal', status: 'FROZEN', content: 'test', rationale: 'test fixture', challenged_by: [], aligned_by: [], evidence_refs: [], notes: [] } },
+    by_status: { proposed: [], challenged: [], frozen: ['CON-001'], superseded: [], open: [], discarded: [] },
+    by_category: { retained_goal: ['CON-001'] },
+  }, null, 2));
+
   const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
   fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
   fs.writeFileSync(verdictPath, JSON.stringify({
-    verdict: 'approved', reason: 'test', rulings: []
+    verdict: 'approved',
+    reason: 'test — ledger fully converged',
+    rulings: [],
+    no_substantive_oversight: true,
+    no_substantive_oversight_reason: 'All ledger entries FROZEN. See CON-001 for converged state.',
   }, null, 2));
 }
 
