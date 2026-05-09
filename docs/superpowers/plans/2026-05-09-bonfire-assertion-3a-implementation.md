@@ -1018,14 +1018,14 @@ Edit `schemas/bonfire-v1.json` `delta_schemas.bonfire-h-review.constraints` (lin
 +      "ruling_action_enum": ["freeze", "supersede"],
 +      "ruling_item_shape": {
 +        "type": "object",
-+        "required_fields": ["action", "target_id"],
-+        "target_id_constraint": "ledger_ref",
++        "required_fields": ["action", "id"],
++        "id_constraint": "ledger_ref",
 +        "action_specific_required_fields": {
 +          "freeze": [],
 +          "supersede": ["new_content"]
 +        },
 +        "field_substantive_check": {
-+          "target_id": { "isEmptyOrPlaceholder": false },
++          "id": { "isEmptyOrPlaceholder": false },
 +          "new_content": { "isEmptyOrPlaceholder": false, "applies_when_action": "supersede" }
 +        }
 +      }
@@ -1153,24 +1153,24 @@ test('validateDelta rejects ruling missing required action field', () => {
     verdict: 'approved',
     reason: 'one ruling',
     conditions: [],
-    rulings: [{ target_id: 'CON-001' }],
+    rulings: [{ id: 'CON-001' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => /action/.test(e)));
 });
 
-test('validateDelta rejects ruling with non-ledger-pattern target_id', () => {
+test('validateDelta rejects ruling with non-ledger-pattern id', () => {
   const verdict = {
     agent: 'bonfire-h-review',
     verdict: 'approved',
     reason: 'one ruling',
     conditions: [],
-    rulings: [{ action: 'freeze', target_id: 'XYZ-not-valid' }],
+    rulings: [{ action: 'freeze', id: 'XYZ-not-valid' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, false);
-  assert.ok(result.errors.some(e => /target_id|ledger_ref|pattern/.test(e)));
+  assert.ok(result.errors.some(e => /id|ledger_ref|pattern/.test(e)));
 });
 
 test('validateDelta rejects supersede ruling with empty new_content', () => {
@@ -1179,7 +1179,7 @@ test('validateDelta rejects supersede ruling with empty new_content', () => {
     verdict: 'approved',
     reason: 'supersede',
     conditions: [],
-    rulings: [{ action: 'supersede', target_id: 'CON-001', new_content: '' }],
+    rulings: [{ action: 'supersede', id: 'CON-001', new_content: '' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, false);
@@ -1192,7 +1192,7 @@ test('validateDelta rejects supersede ruling missing new_content', () => {
     verdict: 'approved',
     reason: 'supersede',
     conditions: [],
-    rulings: [{ action: 'supersede', target_id: 'CON-001' }],
+    rulings: [{ action: 'supersede', id: 'CON-001' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, false);
@@ -1205,7 +1205,7 @@ test('validateDelta passes legitimate freeze ruling', () => {
     verdict: 'approved',
     reason: 'one ruling',
     conditions: [],
-    rulings: [{ action: 'freeze', target_id: 'CON-001' }],
+    rulings: [{ action: 'freeze', id: 'CON-001' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, true, `errors: ${result.errors.join('; ')}`);
@@ -1217,7 +1217,7 @@ test('validateDelta passes legitimate supersede ruling with new_content', () => 
     verdict: 'approved',
     reason: 'one supersede',
     conditions: [],
-    rulings: [{ action: 'supersede', target_id: 'CON-001', new_content: 'Updated requirement: support OAuth2 with PKCE' }],
+    rulings: [{ action: 'supersede', id: 'CON-001', new_content: 'Updated requirement: support OAuth2 with PKCE' }],
   };
   const result = validateDelta('bonfire-h-review', verdict);
   assert.equal(result.valid, true, `errors: ${result.errors.join('; ')}`);
@@ -1253,10 +1253,10 @@ Edit `bin/lib/delta-parser.cjs`. Add a new block after the existing condition_it
             errors.push(`rulings[${i}] missing required field: ${required}`);
           }
         }
-        if (shape.target_id_constraint === 'ledger_ref' && item.target_id && ledgerRefRe) {
-          if (!ledgerRefRe.test(item.target_id)) {
+        if (shape.id_constraint === 'ledger_ref' && item.id && ledgerRefRe) {
+          if (!ledgerRefRe.test(item.id)) {
             errors.push(
-              `rulings[${i}].target_id "${item.target_id}" does not match ledger_id_pattern`
+              `rulings[${i}].id "${item.id}" does not match ledger_id_pattern`
             );
           }
         }
@@ -1319,7 +1319,7 @@ ATTACK LEVEL: L3 — condition with placeholder string in `text`
   "verdict": "approved",
   "reason": "review complete",
   "conditions": [],
-  "rulings": [{ "action": "supersede", "target_id": "CON-001", "new_content": "" }]
+  "rulings": [{ "action": "supersede", "id": "CON-001", "new_content": "" }]
 }
 ```
 
@@ -1353,14 +1353,14 @@ Schema location 2 of Assertion 3a (delta_schemas.bonfire-h-review.constraints):
 - Extend condition_item_shape with field_substantive_check applying
   isEmptyOrPlaceholder to text field
 - Add new ruling_item_shape parallel to condition_item_shape:
-  - required_fields: [action, target_id]
-  - target_id_constraint: ledger_ref (via schema.ledger_id_pattern)
+  - required_fields: [action, id]
+  - id_constraint: ledger_ref (via schema.ledger_id_pattern)
   - action_specific_required_fields: supersede needs new_content
-  - field_substantive_check: target_id + new_content (when action=supersede)
+  - field_substantive_check: id + new_content (when action=supersede)
 
 bin/lib/delta-parser.cjs validateDelta extended with:
 - field_substantive_check loop in condition_item_shape block
-- new ruling_item_shape block with required_fields / target_id_constraint /
+- new ruling_item_shape block with required_fields / id_constraint /
   action_specific_required_fields / field_substantive_check evaluations
 
 per-element substantive check short-circuits validate-delta on first failure;
@@ -1442,7 +1442,7 @@ const SAMPLE_SNAPSHOT = {
 };
 
 test('checkVerdictSubstantive rule 1 fires for approved_with_conditions + empty conditions (no escape)', () => {
-  const verdict = { verdict: 'approved_with_conditions', conditions: [], rulings: [{ action: 'freeze', target_id: 'CON-001' }] };
+  const verdict = { verdict: 'approved_with_conditions', conditions: [], rulings: [{ action: 'freeze', id: 'CON-001' }] };
   const r = checkVerdictSubstantive(verdict, SCHEMA, SAMPLE_SNAPSHOT);
   assert.equal(r.valid, false);
   assert.match(r.error, /approved_with_conditions_requires_conditions|conditions_empty/);
@@ -1496,7 +1496,7 @@ test('checkVerdictSubstantive passes legitimate non-empty verdict', () => {
   const verdict = {
     verdict: 'approved',
     conditions: [],
-    rulings: [{ action: 'freeze', target_id: 'CON-001' }],
+    rulings: [{ action: 'freeze', id: 'CON-001' }],
   };
   const r = checkVerdictSubstantive(verdict, SCHEMA, SAMPLE_SNAPSHOT);
   assert.equal(r.valid, true);
@@ -1644,7 +1644,7 @@ ATTACK LEVEL: L0 — empty conditions and rulings, no escape valve
   "verdict": "approved_with_conditions",
   "reason": "review complete",
   "conditions": [],
-  "rulings": [{ "action": "freeze", "target_id": "CON-001" }]
+  "rulings": [{ "action": "freeze", "id": "CON-001" }]
 }
 ```
 
@@ -1940,7 +1940,7 @@ H-Review verdicts are now subject to a top-level structural check after
   containing ≥1 ledger ID that resolves in the active FROZEN ledger snapshot.
 
 Per-element vacuousness in conditions or rulings (e.g.,
-`text: "see ledger"`, `target_id: ""`, supersede with empty `new_content`)
+`text: "see ledger"`, `id: ""`, supersede with empty `new_content`)
 is caught by `validate-delta` element-level checks before this top-level
 check fires.
 
@@ -2046,7 +2046,7 @@ drift, separate fixture-driven spec) and ASSERTION-4 round-4 spec re-cut
 - `validateLedgerRef(value, schema, ledgerSnapshot, minRefs)` — same signature in validation-helpers.cjs (Task 1) and consumed in seam-validation.cjs (Task 2 escape migration), state.cjs (Task 4). ✓
 - `deepCheckHandoffSubstantiveSlots(handoff, schema, ledgerSnapshot)` — defined in seam-validation.cjs (Task 2), consumed in test-archive-replay.js (Task 5). ✓
 - `checkVerdictSubstantive(verdict, schema, ledgerSnapshot)` — defined in state.cjs (Task 4), consumed in test-archive-replay.js (Task 5). ✓
-- Schema field names: `min_entries`, `required_subfields`, `target_id_constraint`, `field_substantive_check`, `reason_ref_constraint`, `escape_allowed`, `reject_when` — used consistently across schema diffs and validator code. ✓
+- Schema field names: `min_entries`, `required_subfields`, `id_constraint`, `field_substantive_check`, `reason_ref_constraint`, `escape_allowed`, `reject_when` — used consistently across schema diffs and validator code. ✓
 - `PLACEHOLDER_STRINGS` exported lower-case (matches normalization in `isEmptyOrPlaceholder`). ✓
 
 No type/name drift detected.

@@ -281,14 +281,14 @@ The `reason_ref_constraint: "ledger_ref"` flag declares that `reason_field` must
 ```json
 "ruling_item_shape": {
   "type": "object",
-  "required_fields": ["action", "target_id"],
-  "target_id_constraint": "ledger_ref",
+  "required_fields": ["action", "id"],
+  "id_constraint": "ledger_ref",
   "action_specific_required_fields": {
     "freeze": [],
     "supersede": ["new_content"]
   },
   "field_substantive_check": {
-    "target_id": { "isEmptyOrPlaceholder": false },
+    "id": { "isEmptyOrPlaceholder": false },
     "new_content": { "isEmptyOrPlaceholder": false, "applies_when_action": "supersede" }
   }
 }
@@ -298,7 +298,9 @@ The `reason_ref_constraint: "ledger_ref"` flag declares that `reason_field` must
 
 `validate-delta` (the function that ingests `h-review-verdict.json`) extends to:
 - For each entry in `conditions[]`: apply `condition_item_shape.field_substantive_check`. Reject if any field fails `isEmptyOrPlaceholder: false`.
-- For each entry in `rulings[]`: apply `ruling_item_shape` checks — required_fields present, `target_id` matches via `target_id_constraint: "ledger_ref"` (calls `validateLedgerRef` per Section 6.7), action-specific subfields present per `action_specific_required_fields[entry.action]`, all fields with `field_substantive_check` satisfy their rules.
+- For each entry in `rulings[]`: apply `ruling_item_shape` checks — required_fields present, `id` matches via `id_constraint: "ledger_ref"` (calls `validateLedgerRef` per Section 6.7), action-specific subfields present per `action_specific_required_fields[entry.action]`, all fields with `field_substantive_check` satisfy their rules.
+
+**Field naming — `id` not `target_id`.** The ruling's target ledger entry is referenced by the field name `id` (not `target_id`). This aligns with the v1 contract frozen by Assertion 1 (PR #2 merged 2026-05-05): `bin/lib/freeze-enforcement.cjs` and `bin/lib/state.cjs` both treat `ruling.id` as the canonical ledger-target identifier across `apply-h-rulings` and `state-advance --step stage-h`. Renaming to `target_id` would be a breaking change to a frozen contract for marginal semantic clarity. The narrative meaning ("the id of the ledger entry this ruling targets") is preserved by spec wording and by the ledger-ref constraint name (`id_constraint: "ledger_ref"`); the schema field name itself stays `id` for codebase consistency.
 
 `validate-delta` short-circuits on the first failure within an entry; this means an attack like `conditions: [{text: "see ledger"}]` is caught here at element level — not by Section 6.4's top-level predicate (which only catches the literal-empty case).
 
@@ -407,14 +409,14 @@ The existing `handoff_mandate_params.escape_valve` is migrated to the same `*_co
 +    "ruling_action_enum": ["freeze", "supersede"],
 +    "ruling_item_shape": {
 +      "type": "object",
-+      "required_fields": ["action", "target_id"],
-+      "target_id_constraint": "ledger_ref",
++      "required_fields": ["action", "id"],
++      "id_constraint": "ledger_ref",
 +      "action_specific_required_fields": {
 +        "freeze": [],
 +        "supersede": ["new_content"]
 +      },
 +      "field_substantive_check": {
-+        "target_id": { "isEmptyOrPlaceholder": false },
++        "id": { "isEmptyOrPlaceholder": false },
 +        "new_content": { "isEmptyOrPlaceholder": false, "applies_when_action": "supersede" }
 +      }
 +    }
@@ -475,7 +477,7 @@ This section is the single source of call-graph deltas for plan-phase. Pure refe
 **Integration point 2: `validate-delta` for bonfire-h-review** (`bin/lib/delta-parser.cjs`)
 - Caller: `bin/bonfire-tools.cjs` indirectly via `state-advance --step stage-h` (which invokes `apply-h-rulings` then `validate-delta`).
 - Existing call path: `validate-delta('bonfire-h-review', verdict)` checks `required_fields`, `verdict_enum`, `conflict_type_required_when_rejected`, `condition_item_shape`.
-- 3a addition: extend `condition_item_shape` check with `field_substantive_check`. Add new `ruling_item_shape` check with `required_fields`, `target_id_constraint: "ledger_ref"` (calls `validateLedgerRef`), `action_specific_required_fields`, `field_substantive_check`. Both call `isEmptyOrPlaceholder` from the shared helper for content checks; `validateLedgerRef` for ref structure + resolution.
+- 3a addition: extend `condition_item_shape` check with `field_substantive_check`. Add new `ruling_item_shape` check with `required_fields`, `id_constraint: "ledger_ref"` (calls `validateLedgerRef`), `action_specific_required_fields`, `field_substantive_check`. Both call `isEmptyOrPlaceholder` from the shared helper for content checks; `validateLedgerRef` for ref structure + resolution.
 
 **Integration point 3: `state-advance --step stage-h` verdict-level check** (`bin/lib/state.cjs`)
 - Caller: `bin/bonfire-tools.cjs` `state-advance` CLI subcommand.
@@ -498,7 +500,7 @@ state-advance --step stage-h (CLI)
        │   ├─ checkConditionItemShape()        ← existing, EXTENDED with field_substantive_check
        │   └─ checkRulingItemShape()           ← NEW
        │       ├─ isEmptyOrPlaceholder()       ← shared helper
-       │       └─ validateLedgerRef()          ← shared helper (target_id_constraint)
+       │       └─ validateLedgerRef()          ← shared helper (id_constraint)
        └─ checkVerdictSubstantive()            ← NEW
            ├─ isEmptyOrPlaceholder()           ← shared helper (literal-empty checks via empty arrays)
            └─ validateLedgerRef()              ← shared helper (escape valve reason_ref_constraint)
@@ -542,7 +544,7 @@ New adversarial fixtures added to `tests/fixtures/hj-seam-adversarial/` covering
 | `vacuous-verdict-l0/` | L0 | H verdict: `verdict: "approved"`, `conditions: []`, `rulings: []`, no escape | `state-advance --step stage-h` exit ≠ 0 |
 | `vacuous-verdict-contradiction/` | top-level | H verdict: `verdict: "approved_with_conditions"`, `conditions: []` | `state-advance --step stage-h` exit ≠ 0 (escape disallowed for this rule) |
 | `vacuous-verdict-l3/` | L3 | H verdict: conditions = `[{text: "see ledger", target_stage: "stage-j"}]`, rulings = `[]` | `state-advance --step stage-h` exit ≠ 0 |
-| `vacuous-rulings-supersede/` | L2 | H verdict: rulings = `[{action: "supersede", target_id: "CON-001", new_content: ""}]` | `state-advance --step stage-h` exit ≠ 0 |
+| `vacuous-rulings-supersede/` | L2 | H verdict: rulings = `[{action: "supersede", id: "CON-001", new_content: ""}]` | `state-advance --step stage-h` exit ≠ 0 |
 
 ### 7.2 Class B — Escape valve legit fixtures must pass
 
