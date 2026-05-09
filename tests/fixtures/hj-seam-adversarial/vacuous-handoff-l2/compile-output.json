@@ -1,0 +1,48 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "L2 vacuous-pass attack",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "unit-1" }],
+    "domain_model": {
+      "entities": [
+        {
+          "name": "",
+          "fields": null
+        }
+      ]
+    },
+    "function_contracts": [
+      {
+        "purpose": "  ",
+        "invariants": "",
+        "failure_modes": null
+      }
+    ],
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-001",
+      "schema": ""
+    },
+    "ui_contract": {
+      "panels": [
+        {
+          "description": null,
+          "elements": "",
+          "states": "  "
+        }
+      ],
+      "state_ownership": {
+        "owner_map": null
+      },
+      "empty_states": {
+        "surfaces": null,
+        "messaging": ""
+      },
+      "error_states": {
+        "error_map": null
+      }
+    }
+  }
+}

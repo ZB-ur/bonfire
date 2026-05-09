@@ -1,0 +1,3 @@
+{"type":"propose","id":"CON-001","category":"retained_goal","content":"Pure UI feature: render static informational panel; no domain entities required","source":"stage-a","rationale":"Feature is display-only; all data is read from ledger at render time","timestamp":"2026-05-09T00:00:00Z"}
+{"type":"update","id":"CON-001","field":"aligned_by","value":"stage-g-survival","timestamp":"2026-05-09T00:00:01Z"}
+{"type":"freeze","id":"CON-001","timestamp":"2026-05-09T00:00:02Z"}

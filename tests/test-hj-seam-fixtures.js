@@ -257,6 +257,88 @@ test('errors-mode failure preserves legacy {error, details} payload (backward co
   }
 });
 
+// ---------------------------------------------------------------------------
+// Phase 2 follow-up: Class A (L0-L3) vacuous-handoff fixtures + Class B legit
+// escape. Spec §7.1 / §7.2. Implementation plan steps 2.12-2.18.
+// ---------------------------------------------------------------------------
+
+test('fixture: vacuous-handoff-l0 — L0 empty containers rejected by deep-check', () => {
+  // All substantive slots contain empty containers ([], {}). No semantic payload.
+  // deepCheckHandoffSubstantiveSlots must fire before Layer 2a and reject.
+  const dir = makeTmpDir();
+  try {
+    installReentryFixture(dir, 'vacuous-handoff-l0');
+    const result = runHandoffValidate(dir);
+    assert.notEqual(result.code, 0, 'L0 vacuous handoff must fail handoff-validate');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /deep_check_failed/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: vacuous-handoff-l1 — L1 [{}] shape rejected by deep-check', () => {
+  // Per-entry slots have non-empty arrays but elements are {} with no required_subfields.
+  // deep-check asserts each entry has all required_subfields present and non-placeholder.
+  const dir = makeTmpDir();
+  try {
+    installReentryFixture(dir, 'vacuous-handoff-l1');
+    const result = runHandoffValidate(dir);
+    assert.notEqual(result.code, 0, 'L1 [{}] handoff must fail handoff-validate');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /deep_check_failed/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: vacuous-handoff-l2 — L2 empty/null/whitespace subfields rejected', () => {
+  // required_subfields present but values are empty string, null, or whitespace.
+  // isEmptyOrPlaceholder must return true for all three; deep-check rejects.
+  const dir = makeTmpDir();
+  try {
+    installReentryFixture(dir, 'vacuous-handoff-l2');
+    const result = runHandoffValidate(dir);
+    assert.notEqual(result.code, 0, 'L2 empty-subfield handoff must fail handoff-validate');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /deep_check_failed/i);
+    assert.match(out, /empty or placeholder/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: vacuous-handoff-l3 — L3 placeholder strings rejected', () => {
+  // required_subfields set to registered placeholder strings (TODO, see ledger,
+  // ..., <TBD>, <placeholder>, TBD, placeholder). isEmptyOrPlaceholder must
+  // recognize all of these case-insensitively.
+  const dir = makeTmpDir();
+  try {
+    installReentryFixture(dir, 'vacuous-handoff-l3');
+    const result = runHandoffValidate(dir);
+    assert.notEqual(result.code, 0, 'L3 placeholder-string handoff must fail handoff-validate');
+    const out = result.stdout + result.stderr;
+    assert.match(out, /deep_check_failed/i);
+    assert.match(out, /empty or placeholder/i);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('fixture: legit-no-substantive-contract — valid escape valve passes deep-check', () => {
+  // Class B fixture: domain_model.entities is empty but no_substantive_contract=true
+  // on the container with a valid reason referencing FROZEN CON-001. All other
+  // substantive slots carry real content. handoff-validate must exit 0.
+  const dir = makeTmpDir();
+  try {
+    installProvenanceFixture(dir, 'legit-no-substantive-contract');
+    const result = runHandoffValidate(dir);
+    assert.equal(result.code, 0, `legit escape valve must pass. stderr: ${result.stderr}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
 test('fixture: cross-language-approved — KNOWN GAP F1: Layer 1 still rejects despite valid Layer 2', () => {
   // Spec §6.4 claims a legitimate path: H-Review issues a stage-j condition whose
   // text carries the approved CJK UI copy; the compile-output slot cites the

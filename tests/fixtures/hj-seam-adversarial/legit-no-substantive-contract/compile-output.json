@@ -1,0 +1,28 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "Pure UI feature; render static informational panel",
+    "retained_goal": "Render static informational panel with no domain entities required",
+    "implementation_scope": "Static render of panel UI; no domain entities",
+    "implementation_units": [{ "id": "unit-1" }],
+    "domain_model": {
+      "entities": [],
+      "no_substantive_contract": true,
+      "no_substantive_contract_reason": "Pure UI feature; no domain entities. See CON-001 for the converged scope decision confirming entity-free architecture."
+    },
+    "function_contracts": [
+      {
+        "source_kind": "ledger_direct",
+        "source_ref": "CON-001",
+        "purpose": "Render static informational panel; no domain entities required",
+        "invariants": "Panel must render static informational; no domain entities required",
+        "failure_modes": "Panel must not render; no domain entities; no informational static ui feature"
+      }
+    ],
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-001",
+      "schema": "pure ui feature render static informational panel no domain entities required"
+    }
+  }
+}

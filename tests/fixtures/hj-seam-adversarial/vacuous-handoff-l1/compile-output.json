@@ -1,0 +1,31 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "L1 vacuous-pass attack",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "unit-1" }],
+    "domain_model": {
+      "entities": [{}]
+    },
+    "function_contracts": [{}],
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-001",
+      "schema": "flat table: id INTEGER PRIMARY KEY, name TEXT NOT NULL"
+    },
+    "ui_contract": {
+      "panels": [{}],
+      "state_ownership": {
+        "owner_map": { "dashboard": "store" }
+      },
+      "empty_states": {
+        "surfaces": ["dashboard"],
+        "messaging": "No data yet"
+      },
+      "error_states": {
+        "error_map": { "network": "Retry" }
+      }
+    }
+  }
+}
