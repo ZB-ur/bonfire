@@ -161,3 +161,30 @@ test('validateLedgerRef respects minRefs=0 explicitly (?? semantics, not || whic
   assert.equal(result.valid, true);
   assert.deepEqual(result.refs, []);
 });
+
+test('validateLedgerRef rejects non-FROZEN ref (status check, spec §6.7 contract literal)', () => {
+  // SAMPLE_SNAPSHOT has RISK-014 with status: 'OPEN'. Spec §6.7 helper contract
+  // says refs must resolve against FROZEN snapshot — non-FROZEN entries are
+  // not authoritative and cannot back an escape valve. Mirrors Layer 2a check
+  // at bin/lib/schema.cjs:151-153. Phase 2 follow-up: caught after subagent
+  // surfaced ref-presence-only behavior; spec reviewers (Phase 1) missed the
+  // literal contract cross-check.
+  const result = validateLedgerRef('See RISK-014 (OPEN, not FROZEN)', TEST_SCHEMA, SAMPLE_SNAPSHOT, 1);
+  assert.equal(result.valid, false);
+  assert.match(result.error, /FROZEN|OPEN/i);
+  assert.ok(Array.isArray(result.non_frozen));
+  assert.deepEqual(result.non_frozen, ['RISK-014']);
+});
+
+test('validateLedgerRef error message distinguishes not-found from not-FROZEN', () => {
+  // Two distinct error categories: ref doesn't exist in entries vs ref exists
+  // but wrong status. Different fix paths for the operator (forge ref vs
+  // freeze ref), so error messages differ.
+  const notFound = validateLedgerRef('See CON-999', TEST_SCHEMA, SAMPLE_SNAPSHOT, 1);
+  assert.equal(notFound.valid, false);
+  assert.match(notFound.error, /not found/i);
+
+  const nonFrozen = validateLedgerRef('See RISK-014', TEST_SCHEMA, SAMPLE_SNAPSHOT, 1);
+  assert.equal(nonFrozen.valid, false);
+  assert.match(nonFrozen.error, /not FROZEN|expected FROZEN/);
+});

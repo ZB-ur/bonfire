@@ -42,13 +42,27 @@ function validateLedgerRef(value, schema, ledgerSnapshot, minRefs) {
     };
   }
   const entries = (ledgerSnapshot && ledgerSnapshot.entries) || {};
-  const unresolved = refs.filter(r => !(r in entries));
-  if (unresolved.length > 0) {
+  const notFound = refs.filter(r => !(r in entries));
+  if (notFound.length > 0) {
     return {
       valid: false,
-      error: `unresolved refs in ledger: ${unresolved.join(', ')}`,
+      error: `unresolved refs in ledger (not found): ${notFound.join(', ')}`,
       refs,
-      unresolved,
+      unresolved: notFound,
+    };
+  }
+  // Per ASSERTION-3a spec §6.7 helper contract: "asserts each match resolves
+  // against the active FROZEN ledger snapshot". Non-FROZEN entries (PROPOSED,
+  // CHALLENGED, SUPERSEDED, etc.) are not authoritative and cannot back an
+  // escape valve. Mirrors Layer 2a's bin/lib/schema.cjs:151-153 status check.
+  const nonFrozen = refs.filter(r => entries[r].status !== 'FROZEN');
+  if (nonFrozen.length > 0) {
+    const details = nonFrozen.map(r => `${r} is ${entries[r].status || '<missing>'}, expected FROZEN`).join('; ');
+    return {
+      valid: false,
+      error: `refs not FROZEN: ${details}`,
+      refs,
+      non_frozen: nonFrozen,
     };
   }
   return { valid: true, refs };
