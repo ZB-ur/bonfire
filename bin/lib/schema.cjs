@@ -178,7 +178,7 @@ function checkEntryProvenance(entry, pathLabel, context, slotConfig, calib) {
   }
 
   // Layer 2b: round-4 max_contiguous_orphan_run threshold reject.
-  const { maxContiguousOrphanRun } = require('./seam-validation.cjs');
+  const { maxContiguousOrphanRun, compareTokens } = require('./seam-validation.cjs');
   const slotTokens = extractEntryTokens(entry, slotConfig);
 
   // Round-4 v0.1 telemetry omitted: per spec §5 R-A amend, telemetry is
@@ -207,10 +207,13 @@ function checkEntryProvenance(entry, pathLabel, context, slotConfig, calib) {
     }
     const maxRun = maxContiguousOrphanRun(slotTokens, sourceText);
     if (maxRun > calib.threshold_provisional) {
+      const allOrphans = compareTokens(slotTokens, sourceText);
+      const preview = allOrphans.slice(0, 5).join(', ');
+      const moreCount = allOrphans.length > 5 ? ` +${allOrphans.length - 5} more` : '';
       errors.push(
         `${pathLabel}: max_contiguous_orphan_run=${maxRun} > threshold=${calib.threshold_provisional} ` +
         `(${kind}=${JSON.stringify(ref)}; metric_class=${calib.metric_class}; ` +
-        `threshold_status=${calib.threshold_status})`
+        `threshold_status=${calib.threshold_status}; orphan_sample=[${preview}${moreCount}])`
       );
     }
   }
