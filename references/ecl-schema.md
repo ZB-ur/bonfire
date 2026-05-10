@@ -12,12 +12,12 @@
   "source_request": "raw request text",
   "project_paths": { "root": "/path/to/target/repo" },
   "stages": {
-    "preprocess": null,
-    "divergence": null,
-    "requirements": null,
+    "preprocess": "<see stage_schemas.preprocess>",
+    "divergence": "<see stage_schemas.divergence>",
+    "requirements": "<see stage_schemas.requirements>",
     "critique": null,
-    "closure": null,
-    "probes": null,
+    "closure": "<see stage_schemas.closure>",
+    "probes": "<see stage_schemas.probes>",
     "red_blue": null,
     "review": null,
     "compile_for_code": null
@@ -26,6 +26,57 @@
 ```
 
 `case.json` is NOT watched by the dual-write hook. Parent skill explicitly calls `bonfire-tools.cjs render --note <stage>` after writing stage data.
+
+## Stage Output Schemas
+
+Authoritative source: `bonfire-v1.json#stage_schemas` (documentation-only; not runtime-enforced in 3b v0.1).
+
+### Stage A — Preprocess (`stages.preprocess`)
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.preprocess`
+
+Required scalar fields:
+- `reframed_goal` — string
+
+Array fields:
+- `retained_scope` — string array
+- `excluded_scope` — string array
+- `critical_assumptions` — string array
+- `frozen_for_code` — string array
+- `ambiguity_points` — string array
+
+Fields are written flat at `case.json#stages.preprocess.*` (NOT nested in `approval_pack`).
+
+### Stage B — Divergence (`stages.divergence`)
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.divergence`
+
+Array fields:
+- `options` — object array; item fields: `title`, `description`, `blind_spots_covered`, `retained_option`
+
+### Stage C — Requirements (`stages.requirements`)
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.requirements`
+
+Array fields:
+- `requirement_units` — object array; item fields: `id`, `title`, `description`, `success_criteria`, `depends_on`
+
+### Stage E — Closure (`stages.closure`)
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.closure`
+
+Array fields:
+- `dependency_chain` — object array; item fields: `id`, `description`, `upstream`, `downstream`
+- `resolved_gaps` — string array
+
+### Stage F — Probes (`stages.probes`)
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.probes`
+
+Note: Preventive coverage — no current drift evidence; template + playbook aligned. Lock schema to prevent future drift.
+
+Array fields:
+- `probes` — object array; item fields: `hypothesis`, `method`, `expected_signal`, `kill_criteria`, `result`
 
 ## State JSON Structure
 
@@ -58,7 +109,9 @@ Key fields:
 - `read_first`: array
 - `frozen_product_decisions`: array
 - `domain_model`: object
+  - **Provenance fields on each entity:** `source_kind` + `source_ref` required per `handoff_substantive_slots._provenance_required`. See Function Contract Fields above for type definitions.
 - `data_contract`: object
+  - **Provenance fields on data_contract:** `source_kind` + `source_ref` required per `handoff_substantive_slots._provenance_required`. See Function Contract Fields above for type definitions.
 - `ui_contract`: object
 - `function_contracts`: array
 - `file_plan`: array
@@ -78,6 +131,8 @@ Each function contract should include:
 - `id`, `name`, `kind`, `location`, `signature`
 - `purpose`, `inputs`, `outputs`
 - `side_effects`, `invariants`, `failure_modes`
+- `source_kind` — string; one of `ledger_direct` | `condition_rewrite`. Required when `_provenance_required: true` in `bonfire-v1.json#handoff_substantive_slots`. Runtime-enforced by `validateProvenance` in `bin/lib/schema.cjs`.
+- `source_ref` — string (`ledger_direct`) or `{condition_index: <number>}` (`condition_rewrite`). Required alongside `source_kind`.
 
 ### File Plan Fields
 
@@ -102,6 +157,30 @@ Each implementation unit should include:
 - `code_preflight`: shared execution workboard
 - `compile_summary`: compilation process summary
 - `final_handoff`: final readiness statement
+
+### Compile Output Companion Sections
+
+**Authoritative source:** `bonfire-v1.json#stage_schemas.compile_output_companion`
+
+These are inspection surfaces rendered into companion markdown files. The compile-output.json itself is the authoritative artifact; these are derived views.
+
+#### constraint_crosswalk
+- Array: `mappings[]`
+- Item fields: `constraint_id`, `content`, `unit_ids`
+
+#### execution_manifest
+- Array: `waves[]`
+- Item fields: `wave`, `description`, `units`
+
+#### code_batches
+- Array: `batches[]`
+- Item fields: `batch_id`, `description`, `units`
+
+#### compile_summary
+- Fields: `code_ready`, `summary`, `blockers`
+
+#### final_handoff
+- Fields: `statement`, `status`
 
 ## Code Preflight Fields
 
