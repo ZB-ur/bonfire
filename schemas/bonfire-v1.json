@@ -264,6 +264,19 @@
       "min_refs": 1
     }
   },
+  "layer_2b_calibration": {
+    "version": 1,
+    "metric_class": "max_contiguous_orphan_run",
+    "telemetry_metrics": ["overlap_ratio"],
+    "threshold_provisional": 30,
+    "threshold_status": "provisional",
+    "p75_baseline": 25,
+    "safety_margin_pct": 20,
+    "aggregation_method": "median_per_archive_p75",
+    "revisability_delta_pct": 25,
+    "min_slots_per_archive": 5,
+    "calibration_corpus_anchor": "gto-trainer-2026-05-04 N=1"
+  },
   "handoff_mandate_params": {
     "ref_field": "substantive_slot_refs",
     "concrete_ref_patterns": [
