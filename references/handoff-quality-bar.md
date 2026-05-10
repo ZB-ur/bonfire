@@ -78,3 +78,29 @@ now uses a ref-only check: the `no_substantive_contract_reason` must contain
 ≥1 ledger ID matching `schema.ledger_id_pattern` that resolves against the
 active FROZEN ledger snapshot. The previous prose token-coverage check on
 the reason field has been removed (see ASSERTION-3a spec DQ-1).
+
+## Provenance Fields — entity / function-contract / data-contract (D6)
+
+The three handoff slots with `_provenance_required: true` in
+`bonfire-v1.json#handoff_substantive_slots` — **entity** (`domain_model`),
+**function-contract** (`function_contracts`), and **data-contract**
+(`data_contract`) — each require provenance fields on every entry.
+Runtime-enforced by `validateProvenance` in `bin/lib/schema.cjs`.
+
+### Entity (`domain_model`)
+
+**Required provenance fields:**
+- `source_kind` — string; one of `ledger_direct` | `condition_rewrite`. Required per `bonfire-v1.json#handoff_substantive_slots._provenance_required: true`. Runtime-enforced by `validateProvenance` in `bin/lib/schema.cjs`.
+- `source_ref` — `ledger_direct`: ledger entry id (string); `condition_rewrite`: `{condition_index: <number>}`. Required alongside `source_kind`.
+
+### Function Contract (`function_contracts`)
+
+**Required provenance fields:**
+- `source_kind` — string; one of `ledger_direct` | `condition_rewrite`. Required per `bonfire-v1.json#handoff_substantive_slots._provenance_required: true`. Runtime-enforced by `validateProvenance` in `bin/lib/schema.cjs`.
+- `source_ref` — `ledger_direct`: ledger entry id (string); `condition_rewrite`: `{condition_index: <number>}`. Required alongside `source_kind`.
+
+### Data Contract (`data_contract`)
+
+**Required provenance fields:**
+- `source_kind` — string; one of `ledger_direct` | `condition_rewrite`. Required per `bonfire-v1.json#handoff_substantive_slots._provenance_required: true`. Runtime-enforced by `validateProvenance` in `bin/lib/schema.cjs`.
+- `source_ref` — `ledger_direct`: ledger entry id (string); `condition_rewrite`: `{condition_index: <number>}`. Required alongside `source_kind`.
