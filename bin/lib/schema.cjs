@@ -81,6 +81,10 @@ function validateProvenance(compileOutput, context) {
   const errors = [];
   const schema = loadSchema();
   const slots = (schema && schema.handoff_substantive_slots) || {};
+  // Extract layer_2b_calibration once per validateHandoff invocation (per
+  // round-4 quality-review S2 fix: avoid per-slot loadSchema disk reads).
+  // Threaded into checkEntryProvenance via parameter; constant for full run.
+  const calib = (schema && schema.layer_2b_calibration) || null;
 
   for (const [slotPath, slotConfig] of Object.entries(slots)) {
     if (!slotConfig || !slotConfig._provenance_required) continue;
@@ -97,11 +101,11 @@ function validateProvenance(compileOutput, context) {
       const entries = Array.isArray(target) ? target : Object.entries(target).map(([k, v]) => v);
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context, slotConfig);
+        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context, slotConfig, calib);
         errors.push(...entryErrors);
       }
     } else if (slotConfig.kind === 'whole_section') {
-      const sectionErrors = checkEntryProvenance(target, slotPath, context, slotConfig);
+      const sectionErrors = checkEntryProvenance(target, slotPath, context, slotConfig, calib);
       errors.push(...sectionErrors);
     }
   }
@@ -119,7 +123,7 @@ function resolveSlotPath(root, dottedPath) {
   return current;
 }
 
-function checkEntryProvenance(entry, pathLabel, context, slotConfig) {
+function checkEntryProvenance(entry, pathLabel, context, slotConfig, calib) {
   const errors = [];
   if (!entry || typeof entry !== 'object') {
     errors.push(`${pathLabel}: not an object (can't validate provenance)`);
@@ -173,16 +177,46 @@ function checkEntryProvenance(entry, pathLabel, context, slotConfig) {
     sourceText = cond.text || '';
   }
 
-  // Layer 2b: token coverage — after Layer 2a resolves the source, extract
-  // substantive tokens from the slot content and compare against source text.
-  const { compareTokens } = require('./seam-validation.cjs');
+  // Layer 2b: round-4 max_contiguous_orphan_run threshold reject.
+  const { maxContiguousOrphanRun } = require('./seam-validation.cjs');
   const slotTokens = extractEntryTokens(entry, slotConfig);
-  const orphans = compareTokens(slotTokens, sourceText);
-  if (orphans.length > 0) {
-    const preview = orphans.slice(0, 10).join(', ');
-    const more = orphans.length > 10 ? ` (+${orphans.length - 10} more)` : '';
-    errors.push(`${pathLabel}: orphan tokens not in source (${kind}=${JSON.stringify(ref)}): ${preview}${more}`);
+
+  // Round-4 v0.1 telemetry omitted: per spec §5 R-A amend, telemetry is
+  // "compute-only no persistence"; pure-function compute with discarded
+  // result has zero observable effect. Re-analysis at amend time uses
+  // analyze-round-4.js on archived data per rationale (a). Reintroduce
+  // here if Q5 §6.4 trigger materializes a runtime consumer.
+
+  // Round-4 reject: max_contiguous_orphan_run > threshold (per spec §5 + §6.2).
+  // calib threaded from validateProvenance (extracted once per handoff
+  // invocation per quality-review S2 fix; avoids per-slot loadSchema reads).
+  if (calib && typeof calib.threshold_provisional === 'number') {
+    // Source-of-truth assertion (per spec §6.1): warn on drift at call time.
+    // Guard on p75_baseline + safety_margin_pct typeof per quality-review S1
+    // fix: prevents NaN-flood when those fields are absent from schema config.
+    if (typeof calib.p75_baseline === 'number' && typeof calib.safety_margin_pct === 'number') {
+      const expected = Math.round(calib.p75_baseline * (1 + calib.safety_margin_pct / 100));
+      if (calib.threshold_provisional !== expected) {
+        process.stderr.write(
+          `[layer_2b_calibration] WARN: threshold_provisional=${calib.threshold_provisional} ` +
+          `differs from derived ${expected} (p75_baseline=${calib.p75_baseline} × ` +
+          `(1 + ${calib.safety_margin_pct}/100)). Schema PR may have updated baseline ` +
+          `without atomic threshold update; see spec §6.1 source-of-truth contract.\n`
+        );
+      }
+    }
+    const maxRun = maxContiguousOrphanRun(slotTokens, sourceText);
+    if (maxRun > calib.threshold_provisional) {
+      errors.push(
+        `${pathLabel}: max_contiguous_orphan_run=${maxRun} > threshold=${calib.threshold_provisional} ` +
+        `(${kind}=${JSON.stringify(ref)}; metric_class=${calib.metric_class}; ` +
+        `threshold_status=${calib.threshold_status})`
+      );
+    }
   }
+  // Note: if calib is absent (schema not yet round-4), Layer 2b reject is SILENT
+  // (no rejection). This is defensive: handoff still passes Layer 2a + 3a checks.
+  // Schema PR landing layer_2b_calibration is required to activate round-4 reject.
 
   return errors;
 }

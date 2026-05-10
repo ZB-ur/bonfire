@@ -191,3 +191,75 @@ test('Layer 2b: lemmatization — plural slot matches singular source', () => {
   const result = validateHandoff(co, ctx);
   assert.equal(result.valid, true, `errors: ${JSON.stringify(result.errors)}`);
 });
+
+// ---------------------------------------------------------------------------
+// Round-4 Layer 2b threshold tests (per ASSERTION-4 round-4 spec §5 + §6.2)
+// ---------------------------------------------------------------------------
+
+test('round-4 Layer 2b: slot with max_run > 30 rejects', () => {
+  // Construct a handoff slot with a long contiguous orphan run (35 tokens,
+  // all absent from "short ledger entry"). Exceeds threshold=30 → must reject.
+  const co = {
+    handoff: {
+      code_ready: true,
+      handoff_summary: 'x',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'unit-1' }],
+      function_contracts: [{
+        id: 'FC-001',
+        // 35 distinct orphan tokens (none appear in "short ledger entry")
+        purpose: 'aaa bbb ccc ddd eee fff ggg hhh iii jjj kkk lll mmm nnn ooo ppp qqq rrr sss ttt uuu vvv www xxx yyy zzz aab bbc ccd dde eef ffg ggh hhi iij',
+        invariants: [],
+        failure_modes: [],
+        source_kind: 'ledger_direct',
+        source_ref: 'CON-FAKE',
+      }],
+    },
+  };
+  const ctx = {
+    snapshot: { entries: { 'CON-FAKE': { id: 'CON-FAKE', status: 'FROZEN', content: 'short ledger entry' } } },
+    conditions: [],
+  };
+  const result = validateHandoff(co, ctx);
+  assert.equal(result.valid, false);
+  assert.ok(
+    result.errors.some(e => /max_contiguous_orphan_run|threshold/.test(e)),
+    `expected max_contiguous threshold rejection, got: ${result.errors.join('; ')}`
+  );
+});
+
+test('round-4 Layer 2b: slot with max_run ≤ 30 passes Layer 2b threshold', () => {
+  // Slot with ≤ 9 orphan tokens, contiguous. Well below threshold=30.
+  // May fail other validations, but must NOT fail for max_contiguous reason.
+  const co = {
+    handoff: {
+      code_ready: true,
+      handoff_summary: 'x',
+      retained_goal: 'x',
+      implementation_scope: 'x',
+      implementation_units: [{ id: 'unit-1' }],
+      function_contracts: [{
+        id: 'FC-001',
+        purpose: 'short ledger entry plus one two three four five extra orphan tokens',
+        invariants: [],
+        failure_modes: [],
+        source_kind: 'ledger_direct',
+        source_ref: 'CON-LEGIT',
+      }],
+    },
+  };
+  const ctx = {
+    snapshot: { entries: { 'CON-LEGIT': { id: 'CON-LEGIT', status: 'FROZEN', content: 'short ledger entry' } } },
+    conditions: [],
+  };
+  const result = validateHandoff(co, ctx);
+  // May fail other validations (function_contracts slot provenance checks etc.)
+  // but must NOT fail for max_contiguous_orphan_run reason.
+  if (!result.valid) {
+    assert.ok(
+      !result.errors.some(e => /max_contiguous_orphan_run|threshold/.test(e)),
+      `unexpected max_contiguous threshold rejection on legit slot: ${result.errors.join('; ')}`
+    );
+  }
+});
