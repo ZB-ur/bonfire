@@ -277,6 +277,83 @@
     "min_slots_per_archive": 5,
     "calibration_corpus_anchor": "gto-trainer-2026-05-04 N=1"
   },
+  "stage_schemas": {
+    "_note": "Documentation-only field schemas for stage outputs. Not runtime-enforced. Authoritative for ecl-schema.md and stage-playbook.md derivation. Future assertion may extend to runtime enforcement.",
+    "version": 1,
+    "preprocess": {
+      "source": "case.json#stages.preprocess",
+      "note": "Fields written flat at top level — not nested in approval_pack sub-object",
+      "required_fields": ["reframed_goal"],
+      "array_fields": {
+        "retained_scope":       { "items": "string" },
+        "excluded_scope":       { "items": "string" },
+        "critical_assumptions": { "items": "string" },
+        "frozen_for_code":      { "items": "string" },
+        "ambiguity_points":     { "items": "string" }
+      }
+    },
+    "divergence": {
+      "source": "case.json#stages.divergence",
+      "array_fields": {
+        "options": {
+          "items": "object",
+          "item_fields": ["title", "description", "blind_spots_covered", "retained_option"]
+        }
+      }
+    },
+    "requirements": {
+      "source": "case.json#stages.requirements",
+      "array_fields": {
+        "requirement_units": {
+          "items": "object",
+          "item_fields": ["id", "title", "description", "success_criteria", "depends_on"]
+        }
+      }
+    },
+    "closure": {
+      "source": "case.json#stages.closure",
+      "array_fields": {
+        "dependency_chain": {
+          "items": "object",
+          "item_fields": ["id", "description", "upstream", "downstream"]
+        },
+        "resolved_gaps": { "items": "string" }
+      }
+    },
+    "probes": {
+      "source": "case.json#stages.probes",
+      "note": "Preventive coverage — no current drift evidence; template + playbook aligned. Lock schema to prevent future drift.",
+      "array_fields": {
+        "probes": {
+          "items": "object",
+          "item_fields": ["hypothesis", "method", "expected_signal", "kill_criteria", "result"]
+        }
+      }
+    },
+    "compile_output_companion": {
+      "note": "Inspection surfaces in compile-output.json — not alternate sources of truth. The compile-output.json itself is the authoritative artifact; these are companion sections rendered into separate markdown files.",
+      "sections": {
+        "constraint_crosswalk": {
+          "array": "mappings",
+          "item_fields": ["constraint_id", "content", "unit_ids"]
+        },
+        "execution_manifest": {
+          "array": "waves",
+          "item_fields": ["wave", "description", "units"]
+        },
+        "code_batches": {
+          "array": "batches",
+          "item_fields": ["batch_id", "description", "units"]
+        },
+        "compile_summary": {
+          "fields": ["code_ready", "summary", "blockers"]
+        },
+        "final_handoff": {
+          "fields": ["statement", "status"]
+        }
+      }
+    }
+  },
   "handoff_mandate_params": {
     "ref_field": "substantive_slot_refs",
     "concrete_ref_patterns": [
