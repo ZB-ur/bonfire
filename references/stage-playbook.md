@@ -40,21 +40,18 @@ Support agents (optional, parallel + serial):
 1. **intent-extractor** + **reality-checker** (parallel): infer goals, check repo facts
 2. **blind-spot-scout** (serial, after intent-extractor): scan for unconsidered dimensions
 
-Required output fields in `case.json#stages.preprocess`:
+Required output fields in `case.json#stages.preprocess` — flat at top level (NOT nested in `approval_pack` sub-object):
 
-- `user_stated_request`
-- `ambiguity_points`
-- `dubious_claims`
-- `factual_gaps`
-- `hidden_assumptions`
-- `suspected_real_goals`
-- `scenario_fragments`
-- `success_signals`
-- `non_goals`
-- `follow_up_questions`
-- `blocking_unknowns`
-- `reframed_request`
-- `approval_pack`
+- `reframed_goal` — string; the goal as understood after preprocess dialogue
+- `retained_scope` — string array; scope items kept in
+- `excluded_scope` — string array; scope items explicitly excluded
+- `critical_assumptions` — string array; assumptions made explicit
+- `frozen_for_code` — string array; constraints sealed for /code
+- `ambiguity_points` — string array; remaining low-impact unknowns
+
+Stage A agents (intent-extractor, reality-checker, blind-spot-scout) emit working data (dubious_claims, factual_gaps, hidden_assumptions, suspected_real_goals, scenario_fragments, success_signals, non_goals, follow_up_questions, blocking_unknowns) during dialogue — these inform the approval pack but are NOT persisted to `case.json#stages.preprocess`. They appear in support-agent return values and conversation context only.
+
+Schema reference: `bonfire-v1.json#stage_schemas.preprocess` (authoritative).
 
 Exit gate:
 
