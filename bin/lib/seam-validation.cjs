@@ -212,7 +212,13 @@ function validateHConditions(verdict, snapshot) {
     }
     if (verbHit) continue;
 
-    // Rule 1: token coverage
+    // Rule 1: token coverage — skipped when lexicon_exempt is explicitly true
+    // (covers legitimate cross-language UI copy: CJK, Arabic, Cyrillic, proper
+    // nouns, trademarks, technical IDs that H-Review has explicitly approved).
+    // All other Layer 1 checks (paraphrase, verb blacklist, presence, target_stage)
+    // remain active even when lexicon_exempt=true.
+    if (cond.lexicon_exempt === true) continue;
+
     for (const rawToken of condTokens) {
       const token = lemmatizeToken(rawToken);
       if (whitelist.has(token)) continue;

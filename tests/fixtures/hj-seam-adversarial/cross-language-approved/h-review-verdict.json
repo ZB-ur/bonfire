@@ -2,6 +2,11 @@
   "verdict": "approved_with_conditions",
   "reason": "Chinese UI copy approved",
   "conditions": [
-    { "text": "panel titled 开始训练 和 重置统计", "target_stage": "stage-j" }
+    {
+      "text": "panel titled 开始训练 和 重置统计",
+      "target_stage": "stage-j",
+      "lexicon_exempt": true,
+      "lexicon_exempt_reason": "Approved CJK UI copy: 开始训练 (Start Training) and 重置统计 (Reset Stats) are localized Chinese app labels confirmed by H-Review; not in FROZEN ledger because the request is for a Chinese-language UI."
+    }
   ]
 }

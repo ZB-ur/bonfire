@@ -339,27 +339,25 @@ test('fixture: legit-no-substantive-contract — valid escape valve passes deep-
   }
 });
 
-test('fixture: cross-language-approved — KNOWN GAP F1: Layer 1 still rejects despite valid Layer 2', () => {
-  // Spec §6.4 claims a legitimate path: H-Review issues a stage-j condition whose
-  // text carries the approved CJK UI copy; the compile-output slot cites the
-  // condition as source and Layer 2b matches.
+test('fixture: cross-language-approved — F1 CLOSED: lexicon_exempt flag honored — Layer 1 accepts', () => {
+  // F1 gap closed. The condition carries `lexicon_exempt: true` (with audit reason),
+  // which instructs Layer 1 to skip the lexical orphan-token check for that
+  // specific condition. All other Layer 1 checks (paraphrase, verb blacklist,
+  // presence, target_stage) remain active.
   //
-  // In practice Layer 1 rejects the condition FIRST because its substantive tokens
-  // (panel, titled, 开始训练, 和, 重置统计) are not in the FROZEN ledger and not
-  // in the format whitelist. Real pipelines using state-advance --step stage-h
-  // will never reach Layer 2.
+  // Spec §6.4 positive path: H-Review issues a stage-j condition with CJK UI copy
+  // + lexicon_exempt=true → Layer 1 passes → Layer 2 (provenance + token coverage)
+  // passes → full pipeline accepts.
   //
-  // This test pins the current (broken) behavior. When the design decision lands
-  // (flag on condition / require CJK in ledger / CJK Layer-1 exemption — see PR #2
-  // follow-up list), this assertion flips from notEqual to equal.
+  // Cost-asymmetry preserved: flag is explicit per-condition opt-in; not global exemption.
   const dir = makeTmpDir();
   try {
     installProvenanceFixture(dir, 'cross-language-approved');
     const result = runValidateConditions(dir);
-    assert.notEqual(
+    assert.equal(
       result.code, 0,
-      'F1 has been fixed — spec §6.4 positive path now flows through Layer 1. ' +
-      'Flip this assertion to `assert.equal(result.code, 0)` and update the fixture README.'
+      'Layer 1 should accept the condition when lexicon_exempt=true is set. ' +
+      'If this fails, check validateHConditions in seam-validation.cjs and the fixture.'
     );
   } finally {
     fs.rmSync(dir, { recursive: true });

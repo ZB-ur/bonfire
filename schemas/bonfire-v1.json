@@ -393,9 +393,18 @@
         "condition_item_shape": {
           "type": "object",
           "required_fields": ["text", "target_stage"],
+          "optional_fields": ["lexicon_exempt", "lexicon_exempt_reason"],
           "target_stage_enum": ["stage-j"],
           "field_substantive_check": {
             "text": { "isEmptyOrPlaceholder": false }
+          },
+          "lexicon_exempt": {
+            "type": "boolean",
+            "description": "When true, Layer 1 skips the lexical orphan-token check for this specific condition. For use with legitimate cross-language UI copy (CJK, Arabic, Cyrillic, proper nouns, trademarks, technical IDs) that H-Review has explicitly approved. Does NOT exempt other Layer 1 checks (presence, target_stage, verb blacklist, paraphrase patterns)."
+          },
+          "lexicon_exempt_reason": {
+            "type": "string",
+            "description": "Audit trace for lexicon_exempt=true. Optional but strongly recommended. Mirrors the no_substantive_oversight_reason audit pattern."
           }
         },
         "ruling_action_enum": ["freeze", "supersede"],
