@@ -618,7 +618,12 @@ function stateInitCodeSteps(args) {
   const steps = {};
 
   for (let i = 0; i < units.length; i++) {
-    const stepName = `unit-${i + 1}`;
+    const unitId = units[i].id;
+    if (!unitId || !/^unit-[\w.-]+$/.test(unitId)) {
+      exitError(`stateInitCodeSteps: unit at index ${i} has invalid id="${unitId}"; ` +
+                `expected format unit-[\\w.-]+`, [], 3);
+    }
+    const stepName = unitId;
     steps[stepName] = { status: 'pending', pipeline: 'code' };
   }
 
@@ -627,7 +632,7 @@ function stateInitCodeSteps(args) {
 
   // Set current_step to first unit if not set
   if (units.length > 0 && (!state.current_step || !state.current_step.startsWith('unit-'))) {
-    state.current_step = 'unit-1';
+    state.current_step = units[0].id;
   }
 
   saveState(root, state);
