@@ -24,7 +24,7 @@ const CATEGORY_INITIAL_STATUS = {
   retained_goal:      'PROPOSED',
   confirmed_fact:     'PROPOSED',
   frozen_constraint:  'PROPOSED',
-  challenged_claim:   'CHALLENGED',
+  challenged_claim:   'PROPOSED',
   discarded_option:   'DISCARDED',
   high_impact_risk:   'OPEN',
   dependency_chain:   'PROPOSED',
@@ -346,7 +346,11 @@ function annotate(root, opts) {
   if (!entry) throw new Error(`annotate: entry "${id}" not found`);
 
   if (entry.status !== 'FROZEN') {
-    throw new Error(`annotate: entry "${id}" must be FROZEN (current status: "${entry.status}")`);
+    throw new Error(
+      `truth-annotate: entry "${id}" must be FROZEN (current status: "${entry.status}"). ` +
+      `Hint: For PROPOSED/CHALLENGED entries, use truth-update to add evidence: ` +
+      `bonfire truth-update --id ${id} --field evidence_refs --value <ref-id>`
+    );
   }
 
   const historyPath = getHistoryPath(root);
