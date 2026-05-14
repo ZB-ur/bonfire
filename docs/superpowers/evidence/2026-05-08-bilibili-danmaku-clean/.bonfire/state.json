@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "created_at": "2026-05-07T15:42:18.093Z",
+  "updated_at": "2026-05-07T16:54:01.538Z",
+  "pipeline_stage": "code",
+  "current_step": "unit-3",
+  "steps": {
+    "stage-a": {
+      "status": "passed",
+      "pipeline": "pre",
+      "started_at": "2026-05-07T15:42:22.412Z",
+      "passed_at": "2026-05-07T15:51:27.926Z"
+    },
+    "stage-b": {
+      "status": "passed",
+      "pipeline": "plan",
+      "started_at": "2026-05-07T15:51:47.948Z",
+      "passed_at": "2026-05-07T15:52:37.017Z"
+    },
+    "stage-c": {
+      "status": "passed",
+      "pipeline": "plan",
+      "started_at": "2026-05-07T15:52:37.163Z",
+      "passed_at": "2026-05-07T15:54:35.873Z"
+    },
+    "stage-d": {
+      "status": "passed",
+      "pipeline": "plan",
+      "passed_at": "2026-05-07T16:04:39.457Z"
+    },
+    "stage-e": {
+      "status": "passed",
+      "pipeline": "plan",
+      "started_at": "2026-05-07T16:04:39.615Z",
+      "passed_at": "2026-05-07T16:05:23.222Z"
+    },
+    "stage-f": {
+      "status": "passed",
+      "pipeline": "plan",
+      "started_at": "2026-05-07T16:05:23.368Z",
+      "passed_at": "2026-05-07T16:06:51.103Z"
+    },
+    "stage-g": {
+      "status": "passed",
+      "pipeline": "plan",
+      "passed_at": "2026-05-07T16:16:14.899Z"
+    },
+    "stage-h": {
+      "status": "passed",
+      "pipeline": "plan",
+      "passed_at": "2026-05-07T16:20:24.614Z"
+    },
+    "stage-j": {
+      "status": "passed",
+      "pipeline": "plan",
+      "passed_at": "2026-05-07T16:33:31.229Z"
+    },
+    "unit-1": {
+      "status": "passed",
+      "pipeline": "code",
+      "started_at": "2026-05-07T16:34:34.509Z",
+      "passed_at": "2026-05-07T16:41:31.889Z"
+    },
+    "unit-2": {
+      "status": "passed",
+      "pipeline": "code",
+      "started_at": "2026-05-07T16:41:44.281Z",
+      "passed_at": "2026-05-07T16:51:57.390Z"
+    },
+    "unit-3": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-4": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-5": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-6": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-7": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-8": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-9": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-10": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-11": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-12": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-13": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-14": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-15": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "unit-16": {
+      "status": "awaiting_user",
+      "pipeline": "code"
+    },
+    "accept": {
+      "pipeline": "achieve",
+      "status": "gate_failed"
+    }
+  },
+  "approval": {
+    "stage_a_approved": true,
+    "stage_a_approved_at": "2026-05-07T15:51:27.998Z"
+  },
+  "reentry": {
+    "depth": 0,
+    "max_depth": 2,
+    "history": []
+  },
+  "pending_reentry": null,
+  "runs": {
+    "current_run_id": null,
+    "completed_runs": [
+      {
+        "run_id": "run-2026-05-08-dogfood",
+        "verdict": "partial_dogfood_test_scope_limit",
+        "completed_at": "2026-05-07T16:53:01.193Z"
+      }
+    ]
+  }
+}

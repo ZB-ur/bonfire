@@ -1,0 +1,1215 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "Build a Manifest V3 Chrome extension that denoises live Bilibili danmaku in five categories (flood/repeat, low-info single-char/emoji, ad/external-link, toxicity, off-topic) on live.bilibili.com (default + web fullscreen + theater + small floating + replay). Architecture is OPT-C Hybrid Layered: a default DOM MutationObserver path and an opt-in WebSocket page-world hook share one NormalizedDanmakuRecord interface, one WhitelistEngine, and one NoiseClassifier. Default action is collapse-with-count; user may switch to hide or fade. Hard-whitelist for streamer/moderator/SC/guard-rank/gift roles is non-overridable. Normalization runs in two phases (record-construction then text-normalization with NFKC + zero-width strip + BiDi/combining/variation strip + traditional-to-simplified + pinyin + emoji aliases). Classifier output is multi-label (string[]) with priority ladder toxic > ad > flood > lowinfo > offtopic. RU-14 PROBATION handles missing role fields with a runtime empirical-fill on first dev session. RU-09 provides recover/feedback panel with rate-limited Always-allow, typed-CONFIRM for toxic, 7-day decay and bulk-revoke. 100% local processing; no remote calls; no Bilibili backend writes; sideload-friendly distribution.",
+    "retained_goal": "MV3 Chrome extension for live.bilibili.com that performs five-category client-side danmaku denoising with default collapse-with-count action, hard role whitelist, 100% local processing, SPA reset, four playback-mode coverage, replay support, multi-extension coexistence, a11y compliance, censorship-adjacency boundary (client-side hide only). Sideload + open-source GitHub distribution; not Web Store; not VOD; not cloud LLM in MVP.",
+    "implementation_scope": "Full MVP per OPT-C with all 15 RUs (RU-01 through RU-15) implemented. RU-07 (WS hook) is implemented but disabled by default. RU-13 ships an audited zh-Hans profanity dictionary (politically-censored terms manually stripped, license documented). RU-14 ships PROBATION runtime fallback with empirical-fill clause from CON-019 to be measured during the first /code dev session (RU-01.5). All 6 stage-G mitigation constraints (CON-017..022) and all interface contracts (CON-013..016) are implemented as written. v2 features (cloud LLM with user key, store-grade i18n, sync) are explicitly out of scope.",
+    "repo_targets": [
+      "/Users/lddmay/AiCoding/bonfire-test/bilibili-danmaku-denoiser-clean"
+    ],
+    "repo_grounding": {
+      "current_state": "Empty git repository on master branch with no commits. Only the .bonfire/ pipeline scaffold exists (FACT-001).",
+      "no_existing_code": "No package.json, no manifest.json, no src/, no node_modules. Coder creates the entire project from scratch.",
+      "build_toolchain_decision": "Vite + @crxjs/vite-plugin + TypeScript + pnpm. Locked by Stage E closure (DEP-001 resolution). Do not switch to webpack/wxt/plasmo.",
+      "manifest_version": "MV3 only. MV2 is forbidden (frozen_for_code).",
+      "host_permissions": "live.bilibili.com only for live rooms; www.bilibili.com only for replay. No other Bilibili subdomains. No webRequestBlocking. No remote code (DROP-003).",
+      "git_branch": "master (no main yet). User git identity: zhangbeifan."
+    },
+    "read_first": [
+      ".bonfire/truth-surface/constraint-ledger-snapshot.json",
+      ".bonfire/case.json (sections: stages.preprocess.frozen_for_code, stages.requirements.requirement_units, stages.closure.added_units_post_critique, stages.closure.execution_chain, stages.review.preserved_h_review_intent)",
+      ".bonfire/plan/compile-output.json (this file)",
+      "https://developer.chrome.com/docs/extensions/mv3 manifest reference",
+      "https://crxjs.dev/vite-plugin getting-started"
+    ],
+    "frozen_product_decisions": [
+      "FPD-1 (CON-001): All five noise categories must be implemented. Subset implementation forbidden.",
+      "FPD-2 (CON-002): Default action is collapse-with-count. Hide and fade are user-selectable but not default. Default is not hide.",
+      "FPD-3 (CON-006 + CON-022): Hard whitelist roles (streamer/moderator/SC/guard-rank/gift-onboard) are NEVER subject to any detector. Whitelist requires >=2 DOM signals to mitigate forgery (CON-022).",
+      "FPD-4 (DROP-003): 100% local processing. No fetch/XHR/WebSocket/sendBeacon to any non-Bilibili host except chrome.* APIs. No remote model. No telemetry.",
+      "FPD-5 (CON-010): Censorship-adjacency boundary. Client-side hide only. No calls to Bilibili report/delete APIs. No mutation of outgoing Bilibili requests. No leak of denoise state to other users.",
+      "FPD-6 (CON-005): Normalization MUST precede flood/lowinfo detection. Order is fixed in CON-017.",
+      "FPD-7 (CON-012): MV3 only. MV2 forbidden.",
+      "FPD-8 (CON-015): Classifier call order is hard-fixed: P1 (record-construct) -> WhitelistEngine -> P2 (text-normalize) -> 5 detectors in parallel. Reordering is a contract violation.",
+      "FPD-9 (CON-016): NoiseVerdict.category is string[] (multi-label) with priority ladder toxic > ad > flood > lowinfo > offtopic for UI primary-cause display.",
+      "FPD-10 (CON-021): Toxic-category Always-allow requires typed CONFIRM. 60s session whitelist completely disables toxic for that record.",
+      "FPD-11 (CON-019): RU-14 PROBATION includes a /code first-session empirical-fill clause for medalLevel visibility ratio with documented branch behavior.",
+      "FPD-12 (DROP-002): Distribution is sideload + GitHub release. Not Chrome Web Store.",
+      "FPD-13: Storage is chrome.storage.local only. chrome.storage.sync is forbidden in MVP."
+    ],
+    "domain_model": {
+      "entities": [],
+      "states": []
+    },
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-007"
+    },
+    "ui_contract": {
+      "surfaces": [],
+      "states": {},
+      "accessibility": {}
+    },
+    "function_contracts": [],
+    "file_plan": [
+      {
+        "path": "package.json",
+        "action": "create",
+        "why": "pnpm workspace root with vite + @crxjs/vite-plugin + typescript + vitest devDeps (DEP-001).",
+        "depends_on": []
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "action": "create",
+        "why": "Lock file generated by `pnpm install`.",
+        "depends_on": [
+          "package.json"
+        ]
+      },
+      {
+        "path": "tsconfig.json",
+        "action": "create",
+        "why": "TypeScript strict mode for whole project.",
+        "depends_on": []
+      },
+      {
+        "path": "vite.config.ts",
+        "action": "create",
+        "why": "Vite config with @crxjs/vite-plugin pointing to manifest.json.",
+        "depends_on": [
+          "package.json"
+        ]
+      },
+      {
+        "path": "manifest.json",
+        "action": "create",
+        "why": "MV3 manifest. host_permissions for live.bilibili.com + www.bilibili.com replay only. permissions=['storage']. No webRequestBlocking. (RU-01, FPD-7, CON-012, FPD-4)",
+        "depends_on": []
+      },
+      {
+        "path": ".eslintrc.cjs",
+        "action": "create",
+        "why": "ESLint config with custom rule no-network-call to *.bilibili.com (RU-12 enforcement).",
+        "depends_on": []
+      },
+      {
+        "path": "src/shared/types.ts",
+        "action": "create",
+        "why": "NormalizedDanmakuRecord, NoiseVerdict, ExtensionSettings, DenoisedSessionLog, FloodWindowEntry, SelectorRegistryEntry types (CON-013/014/016).",
+        "depends_on": []
+      },
+      {
+        "path": "src/shared/settings.ts",
+        "action": "create",
+        "why": "loadSettings/saveSettings with chrome.storage.local + schema migration + quota fallback (FC-013, RU-08).",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/shared/messaging.ts",
+        "action": "create",
+        "why": "Typed chrome.runtime.sendMessage helpers.",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/normalize.ts",
+        "action": "create",
+        "why": "FC-001 normalizeText with CON-017 ordered pipeline (BiDi/NFKC/combining/zero-width/variation/trad-simp/pinyin/emoji).",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/selector-registry.ts",
+        "action": "create",
+        "why": "FC-016. Initial 5 entries with verifiedAt=null; filled during RU-01.5 dev session (PR-2 mitigation).",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/observer.ts",
+        "action": "create",
+        "why": "FC-002 buildRecord + MutationObserver setup over selectorRegistry containers (RU-03).",
+        "depends_on": [
+          "src/content/selector-registry.ts",
+          "src/content/normalize.ts",
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/lifecycle.ts",
+        "action": "create",
+        "why": "FC-012 ContextLifecycle. pushState patch + popstate + pageshow + visibilitychange (PR-3, CON-004, RU-03).",
+        "depends_on": [
+          "src/content/observer.ts"
+        ]
+      },
+      {
+        "path": "src/content/whitelist.ts",
+        "action": "create",
+        "why": "FC-004 checkWhitelist + dual-signal verification (CON-022) + PROBATION branch (RU-14, CON-019).",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/classifier/index.ts",
+        "action": "create",
+        "why": "FC-005 classify orchestrator + priority-ladder primaryCategory resolver (RU-05, CON-015, CON-016).",
+        "depends_on": [
+          "src/content/whitelist.ts",
+          "src/content/normalize.ts"
+        ]
+      },
+      {
+        "path": "src/content/classifier/flood.ts",
+        "action": "create",
+        "why": "FC-006 FloodDetector with sliding-window + LRU 8192 + per-tick sampling 500 (CON-018, RU-11).",
+        "depends_on": [
+          "src/content/classifier/index.ts"
+        ]
+      },
+      {
+        "path": "src/content/classifier/lowinfo.ts",
+        "action": "create",
+        "why": "FC-007 LowInfoDetector with VTuber preset relaxation (RU-05, ACC-006 item 8).",
+        "depends_on": [
+          "src/content/classifier/index.ts"
+        ]
+      },
+      {
+        "path": "src/content/classifier/ad.ts",
+        "action": "create",
+        "why": "FC-008 AdDetector with URL/QQ/WeChat/+VX regex (RU-05).",
+        "depends_on": [
+          "src/content/classifier/index.ts"
+        ]
+      },
+      {
+        "path": "src/content/classifier/toxic.ts",
+        "action": "create",
+        "why": "FC-009 ToxicDetector loading dict/audited-zh-profanity.txt (RU-05, RU-13, CON-020).",
+        "depends_on": [
+          "src/content/classifier/index.ts",
+          "dict/audited-zh-profanity.txt"
+        ]
+      },
+      {
+        "path": "src/content/classifier/offtopic.ts",
+        "action": "create",
+        "why": "FC-010 OffTopicDetector cosine-distance against community preset (RU-05).",
+        "depends_on": [
+          "src/content/classifier/index.ts"
+        ]
+      },
+      {
+        "path": "src/content/executor.ts",
+        "action": "create",
+        "why": "FC-011 applyAction with 3 modes + a11y aria-hidden + namespace classes (RU-06, CON-008, RU-10).",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/content/recover-panel.tsx",
+        "action": "create",
+        "why": "FC-014 RecoverPanel with rate-limited Always-allow + typed-CONFIRM toxic modal + 7-day decay (RU-09, CON-021, FPD-10).",
+        "depends_on": [
+          "src/shared/settings.ts"
+        ]
+      },
+      {
+        "path": "src/content/index.ts",
+        "action": "create",
+        "why": "Content script entry: assemble lifecycle + observer + classifier + executor + recover-panel pipeline.",
+        "depends_on": [
+          "src/content/lifecycle.ts",
+          "src/content/classifier/index.ts",
+          "src/content/executor.ts",
+          "src/content/recover-panel.tsx"
+        ]
+      },
+      {
+        "path": "src/page/ws-hook.ts",
+        "action": "create",
+        "why": "FC-003 page-world WebSocket interceptor (RU-07, RISK-003 v2 path). Default disabled.",
+        "depends_on": [
+          "src/shared/types.ts"
+        ]
+      },
+      {
+        "path": "src/popup/index.html",
+        "action": "create",
+        "why": "Popup surface (RU-08).",
+        "depends_on": []
+      },
+      {
+        "path": "src/popup/main.ts",
+        "action": "create",
+        "why": "Popup logic: master toggle + mode radio + today count badge.",
+        "depends_on": [
+          "src/shared/settings.ts"
+        ]
+      },
+      {
+        "path": "src/options/index.html",
+        "action": "create",
+        "why": "Options page surface (RU-08, CON-021, CON-020, RU-07 advanced toggle).",
+        "depends_on": []
+      },
+      {
+        "path": "src/options/main.ts",
+        "action": "create",
+        "why": "Options page logic with keyword/UID/room lists + Always-allow management + advanced toggles.",
+        "depends_on": [
+          "src/shared/settings.ts"
+        ]
+      },
+      {
+        "path": "src/background/sw.ts",
+        "action": "create",
+        "why": "FC-015 service worker (RU-01).",
+        "depends_on": [
+          "src/shared/settings.ts"
+        ]
+      },
+      {
+        "path": "dict/audited-zh-profanity.txt",
+        "action": "create",
+        "why": "Audited zh-Hans profanity dictionary (CON-020, RU-13). Manually stripped of politically-censored tokens.",
+        "depends_on": []
+      },
+      {
+        "path": "dict/README.md",
+        "action": "create",
+        "why": "License + source + removed-categories audit log (CON-020).",
+        "depends_on": []
+      },
+      {
+        "path": "tests/normalize.spec.ts",
+        "action": "create",
+        "why": "ACC-004 idempotency unit tests + CON-017 step-by-step coverage.",
+        "depends_on": [
+          "src/content/normalize.ts"
+        ]
+      },
+      {
+        "path": "tests/whitelist.spec.ts",
+        "action": "create",
+        "why": "ACC-005 priority test (5 exempt fixtures with noise text -> PASS) + dual-signal test (CON-022) + PROBATION branch (RU-14).",
+        "depends_on": [
+          "src/content/whitelist.ts"
+        ]
+      },
+      {
+        "path": "tests/classifier.spec.ts",
+        "action": "create",
+        "why": "Per-detector fixtures + multi-label resolution (CON-016) + WhitelistEngine override.",
+        "depends_on": [
+          "src/content/classifier/index.ts"
+        ]
+      },
+      {
+        "path": "tests/flood.spec.ts",
+        "action": "create",
+        "why": "Sliding window + LRU 8192 cap + per-tick 500 sampling + GC behavior (CON-018, RU-11).",
+        "depends_on": [
+          "src/content/classifier/flood.ts"
+        ]
+      },
+      {
+        "path": "tests/lifecycle.spec.ts",
+        "action": "create",
+        "why": "SPA reset idempotency + bfcache pageshow handling (CON-004, PR-3).",
+        "depends_on": [
+          "src/content/lifecycle.ts"
+        ]
+      },
+      {
+        "path": ".bonfire/probes/RU-01.5-empirical-baseline.md",
+        "action": "create",
+        "why": "First /code dev session deliverable (C7): SelectorRegistry verification table for 4 playback modes (PR-2), bfcache event order log (PR-3), medalLevel visibility ratio across 5 real rooms (PR-1, CON-019), live competitor list (PR-4). Branch behavior: if visibility < 50%, switch RU-14 default to fans-medal-only -> detector + 0.2 confidence reduction (CON-019/C1).",
+        "depends_on": [
+          "src/content/observer.ts",
+          "src/content/whitelist.ts"
+        ]
+      },
+      {
+        "path": "README.md",
+        "action": "create",
+        "why": "Sideload install instructions + scope + non-goals + license.",
+        "depends_on": []
+      }
+    ],
+    "implementation_units": [
+      {
+        "id": "unit-1",
+        "title": "MV3 project skeleton + manifest + toolchain",
+        "objective": "Establish a working MV3 unpacked extension that loads in chrome://extensions with empty content + popup + options + background and an idle service worker.",
+        "scope": "package.json, pnpm-lock.yaml, tsconfig.json, vite.config.ts, manifest.json, .eslintrc.cjs. Empty placeholder files for content/popup/options/background entrypoints.",
+        "files": [
+          "package.json",
+          "pnpm-lock.yaml",
+          "tsconfig.json",
+          "vite.config.ts",
+          "manifest.json",
+          ".eslintrc.cjs",
+          "src/background/sw.ts",
+          "src/content/index.ts",
+          "src/popup/index.html",
+          "src/popup/main.ts",
+          "src/options/index.html",
+          "src/options/main.ts",
+          "README.md"
+        ],
+        "functions": [
+          "FC-015"
+        ],
+        "depends_on": [],
+        "verification": [
+          "pnpm install",
+          "pnpm build",
+          "Load Unpacked dist/ in chrome://extensions/ and confirm Service Worker idle status with no errors"
+        ],
+        "done_when": [
+          "dist/manifest.json valid",
+          "Extension loads without errors",
+          "Service worker cold start < 50ms (RU-01 success_criteria)"
+        ]
+      },
+      {
+        "id": "unit-1.5",
+        "title": "First-session empirical baseline (RU-01.5)",
+        "objective": "Fill PR-1 / PR-2 / PR-3 / PR-4 inability-to-probe gaps with a single live dev session against >=5 real Bilibili rooms (logged-in + logged-out). Decide RU-14 default branch.",
+        "scope": "Manual data-collection notebook + selectorRegistry.verifiedAt timestamps + probationSnapshot.medalLevelVisibilityRatio + live-competitor list.",
+        "files": [
+          ".bonfire/probes/RU-01.5-empirical-baseline.md",
+          "src/content/selector-registry.ts"
+        ],
+        "functions": [
+          "FC-016"
+        ],
+        "depends_on": [
+          "unit-1"
+        ],
+        "verification": [
+          "Manual: open 5 live rooms across gaming + VTuber categories, log in once and out once, capture DOM snapshots",
+          "Run normalizeText idempotency test on captured rawText samples"
+        ],
+        "done_when": [
+          "selectorRegistry has verifiedAt for all 5 modes",
+          "probationSnapshot.medalLevelVisibilityRatio populated; if < 0.5 set probationSnapshot.mode='fans-medal-detector-with-penalty' (CON-019/C1)",
+          "RU-01.5-empirical-baseline.md committed with bfcache event-ordering log (PR-3) and live-competitor list (PR-4)"
+        ]
+      },
+      {
+        "id": "unit-2",
+        "title": "Shared types + settings persistence",
+        "objective": "Lock CON-013 / CON-014 / CON-016 type contracts and the chrome.storage.local schema with migration.",
+        "scope": "src/shared/types.ts (all entities from domain_model), src/shared/settings.ts (FC-013), src/shared/messaging.ts.",
+        "files": [
+          "src/shared/types.ts",
+          "src/shared/settings.ts",
+          "src/shared/messaging.ts"
+        ],
+        "functions": [
+          "FC-013"
+        ],
+        "depends_on": [
+          "unit-1"
+        ],
+        "verification": [
+          "pnpm test -- tests/shared",
+          "Manual: write/read settings round-trip in service worker context"
+        ],
+        "done_when": [
+          "All entity types from domain_model exported",
+          "loadSettings returns defaults on first run",
+          "saveSettings emits chrome.storage.onChanged"
+        ]
+      },
+      {
+        "id": "unit-3",
+        "title": "Phase-2 normalization with idempotency tests",
+        "objective": "Implement FC-001 normalizeText covering CON-017's full ordered pipeline, with ACC-004 idempotency tests passing.",
+        "scope": "src/content/normalize.ts + emoji alias table + pinyin lib integration.",
+        "files": [
+          "src/content/normalize.ts",
+          "tests/normalize.spec.ts"
+        ],
+        "functions": [
+          "FC-001"
+        ],
+        "depends_on": [
+          "unit-2"
+        ],
+        "verification": [
+          "pnpm test -- tests/normalize.spec.ts"
+        ],
+        "done_when": [
+          "normalize('草'), normalize('艹'), normalize('cao'), normalize('🌱'), normalize('\\u200b艹\\u200b') all yield 'cao'",
+          "normalize(normalize(x)) === normalize(x) for all fixtures (ACC-004)",
+          "BiDi/combining/variation strip steps each have a passing test (CON-017)"
+        ]
+      },
+      {
+        "id": "unit-4",
+        "title": "DOM observer + lifecycle + record construction",
+        "objective": "Implement FC-002 buildRecord and FC-012 ContextLifecycle so that danmaku DOM nodes produce NormalizedDanmakuRecord events and SPA/bfcache transitions reset cleanly (CON-004).",
+        "scope": "src/content/observer.ts, src/content/lifecycle.ts, src/content/selector-registry.ts wiring with verified entries from unit-1.5.",
+        "files": [
+          "src/content/observer.ts",
+          "src/content/lifecycle.ts",
+          "tests/lifecycle.spec.ts"
+        ],
+        "functions": [
+          "FC-002",
+          "FC-012",
+          "FC-016"
+        ],
+        "depends_on": [
+          "unit-1.5",
+          "unit-3"
+        ],
+        "verification": [
+          "pnpm test -- tests/lifecycle.spec.ts",
+          "Manual: open live room, switch to web-fullscreen/theater/small-floating, navigate to another room (SPA), confirm console logs show new observer attached and old detached"
+        ],
+        "done_when": [
+          "MutationObserver fires NormalizedDanmakuRecord on real chat-item nodes",
+          "ContextLifecycle.reset triggers on pushState, popstate, pageshow(persisted=true), visibilitychange (PR-3)",
+          "Old observer disconnect verified via console diagnostic"
+        ]
+      },
+      {
+        "id": "unit-5",
+        "title": "WhitelistEngine with dual-signal + PROBATION",
+        "objective": "Implement FC-004 checkWhitelist with CON-022 dual-signal verification and RU-14 PROBATION branch wired to probationSnapshot.",
+        "scope": "src/content/whitelist.ts + tests/whitelist.spec.ts.",
+        "files": [
+          "src/content/whitelist.ts",
+          "tests/whitelist.spec.ts"
+        ],
+        "functions": [
+          "FC-004"
+        ],
+        "depends_on": [
+          "unit-2"
+        ],
+        "verification": [
+          "pnpm test -- tests/whitelist.spec.ts"
+        ],
+        "done_when": [
+          "ACC-005 5-role fixtures with noise text return WHITELISTED",
+          "Single fans-medal returns PROBATION (CON-022)",
+          "All-null role/medal/guard returns PROBATION (RU-14)",
+          "isPaid=true requires confirmed parent ancestor in fixture data"
+        ]
+      },
+      {
+        "id": "unit-6",
+        "title": "Five detectors + classifier orchestrator",
+        "objective": "Implement FC-005..FC-010 with multi-label aggregation and priority-ladder primaryCategory (CON-016).",
+        "scope": "src/content/classifier/index.ts + 5 detector files + tests.",
+        "files": [
+          "src/content/classifier/index.ts",
+          "src/content/classifier/flood.ts",
+          "src/content/classifier/lowinfo.ts",
+          "src/content/classifier/ad.ts",
+          "src/content/classifier/toxic.ts",
+          "src/content/classifier/offtopic.ts",
+          "tests/classifier.spec.ts",
+          "tests/flood.spec.ts"
+        ],
+        "functions": [
+          "FC-005",
+          "FC-006",
+          "FC-007",
+          "FC-008",
+          "FC-009",
+          "FC-010"
+        ],
+        "depends_on": [
+          "unit-3",
+          "unit-5",
+          "unit-9"
+        ],
+        "verification": [
+          "pnpm test -- tests/classifier.spec.ts tests/flood.spec.ts"
+        ],
+        "done_when": [
+          "Each detector has independent passing fixtures (RU-05 success_criteria)",
+          "FloodDetector Map.size capped at 8192 LRU verified by test (CON-018)",
+          "Per-tick 500 sampling verified (CON-018)",
+          "Multi-label fixtures resolve primaryCategory by toxic > ad > flood > lowinfo > offtopic (CON-016)",
+          "ToxicDetector disabled when settings.toxicDetectorEnabled=false (CON-020)"
+        ]
+      },
+      {
+        "id": "unit-7",
+        "title": "Action executor with 3 modes + a11y",
+        "objective": "Implement FC-011 applyAction with collapse/hide/fade modes, prefers-contrast auto-degrade, and bdd- namespace classes.",
+        "scope": "src/content/executor.ts + integrated into content/index.ts.",
+        "files": [
+          "src/content/executor.ts"
+        ],
+        "functions": [
+          "FC-011"
+        ],
+        "depends_on": [
+          "unit-6"
+        ],
+        "verification": [
+          "Manual: load extension on a real live room, switch action mode in popup, confirm visual behavior",
+          "Manual: enable system high-contrast, confirm fade -> hide degrade",
+          "DOM inspection: every suppressed node has bdd-* class"
+        ],
+        "done_when": [
+          "Three action modes each demo-pass (RU-06)",
+          "aria-hidden=true on hide mode (CON-008)",
+          "fade auto-degrades to hide under prefers-contrast (CON-008)",
+          "No removeChild on danmaku nodes (CON-009/RU-10)"
+        ]
+      },
+      {
+        "id": "unit-8",
+        "title": "Recover panel + feedback loop with safety bars",
+        "objective": "Implement FC-014 RecoverPanel with restore/Always-allow, typed-CONFIRM toxic modal, rate limit, 7-day decay.",
+        "scope": "src/content/recover-panel.tsx + bulk-revoke UI in options page.",
+        "files": [
+          "src/content/recover-panel.tsx",
+          "src/options/main.ts",
+          "src/options/index.html"
+        ],
+        "functions": [
+          "FC-014"
+        ],
+        "depends_on": [
+          "unit-7"
+        ],
+        "verification": [
+          "Manual: deliberately have a draw-keyword treated as lowinfo; open recover panel; click Restore; confirm same hash passes for 60s in current room",
+          "Manual: try Always-allow on toxic-category entry; confirm typed-CONFIRM modal",
+          "Manual: spam Always-allow > 10 in 60s; confirm rate-limit toast"
+        ],
+        "done_when": [
+          "RU-09 demo passes (suppression -> restore -> hash bypass for 60s)",
+          "Toxic Always-allow requires literal CONFIRM (FPD-10/CON-021)",
+          "Rate limit 10/min enforced (CON-021)",
+          "Bulk-revoke clears alwaysAllowHashes (CON-021)",
+          "7-day decay visible in options (CON-021)"
+        ]
+      },
+      {
+        "id": "unit-9",
+        "title": "Audited profanity dictionary + RU-13",
+        "objective": "Ship audited zh-Hans profanity dictionary in dict/ with manual political-censorship strip and license documentation.",
+        "scope": "dict/audited-zh-profanity.txt + dict/README.md.",
+        "files": [
+          "dict/audited-zh-profanity.txt",
+          "dict/README.md"
+        ],
+        "functions": [],
+        "depends_on": [
+          "unit-1"
+        ],
+        "verification": [
+          "Manual review: dict file < 200KB, no political-censorship tokens (CON-020)",
+          "README documents source, license (MIT/BSD), removed categories audit"
+        ],
+        "done_when": [
+          "dict file packaged in extension build",
+          "README declares source/license/removed",
+          "Extension package total size < 500KB (RU-13 success_criteria)"
+        ]
+      },
+      {
+        "id": "unit-10",
+        "title": "WS hook v2 path (default disabled)",
+        "objective": "Implement FC-003 page-world WebSocket constructor wrap producing NormalizedDanmakuRecord with sourceLayer='ws'. Default settings.enableWsHook=false.",
+        "scope": "src/page/ws-hook.ts + opt-in toggle in options page.",
+        "files": [
+          "src/page/ws-hook.ts"
+        ],
+        "functions": [
+          "FC-003"
+        ],
+        "depends_on": [
+          "unit-2",
+          "unit-6"
+        ],
+        "verification": [
+          "Manual: enable WS hook in options; reload room; confirm console 'WS frames intercepted: N'",
+          "Manual: simulate parse failure; confirm DOM fallback continues without errors (RU-07 success_criteria)"
+        ],
+        "done_when": [
+          "Default install does not inject page world",
+          "WeakMap tracks already-patched WebSocket instances (RU-10)",
+          "Schema parse failure does not throw to host page"
+        ]
+      },
+      {
+        "id": "unit-11",
+        "title": "Popup + options + service-worker wiring",
+        "objective": "Wire popup quick controls, options-page settings, and chrome.runtime messaging end-to-end.",
+        "scope": "src/popup/main.ts, src/options/main.ts, src/background/sw.ts integration.",
+        "files": [
+          "src/popup/main.ts",
+          "src/options/main.ts",
+          "src/background/sw.ts"
+        ],
+        "functions": [
+          "FC-015"
+        ],
+        "depends_on": [
+          "unit-2",
+          "unit-8"
+        ],
+        "verification": [
+          "Manual: change action mode in popup; confirm content script applies within 1s (RU-08 success_criteria)",
+          "Manual: edit keyword blacklist in options; confirm hot-reload"
+        ],
+        "done_when": [
+          "Popup loads <200ms (RU-08)",
+          "Options changes propagate <1s via chrome.storage.onChanged (RU-08)",
+          "Today denoise count visible in popup (RU-09 partial)"
+        ]
+      },
+      {
+        "id": "unit-12",
+        "title": "ESLint network-call rule + censorship boundary",
+        "objective": "Lock RU-12 + CON-010 statically: ESLint rule blocks any fetch/XHR/sendBeacon/WebSocket constructor that targets *.bilibili.com URLs (except read-only WS hook in src/page/ws-hook.ts).",
+        "scope": ".eslintrc.cjs custom rule + manifest audit.",
+        "files": [
+          ".eslintrc.cjs"
+        ],
+        "functions": [],
+        "depends_on": [
+          "unit-1"
+        ],
+        "verification": [
+          "pnpm lint",
+          "Manual: add a fetch('https://api.bilibili.com/...') in any file outside src/page/; confirm lint failure"
+        ],
+        "done_when": [
+          "Manifest contains no webRequestBlocking permission (RU-12)",
+          "ESLint custom rule passes baseline + fails the deliberately-added fetch test"
+        ]
+      },
+      {
+        "id": "unit-13",
+        "title": "Multi-extension coexistence + namespace audit",
+        "objective": "Verify RU-10 namespace isolation; MutationObserver self-loop filter; WeakMap WS instance dedup.",
+        "scope": "Audit observer.ts and executor.ts for self-write filtering + WS hook idempotency.",
+        "files": [
+          "src/content/observer.ts",
+          "src/content/executor.ts",
+          "src/page/ws-hook.ts"
+        ],
+        "functions": [
+          "FC-002",
+          "FC-011",
+          "FC-003"
+        ],
+        "depends_on": [
+          "unit-7",
+          "unit-10"
+        ],
+        "verification": [
+          "Manual ACC-003: install Bilibili Helper + Danmaku-Ji + this extension simultaneously; confirm no console errors and no flicker"
+        ],
+        "done_when": [
+          "Console clean during multi-extension session",
+          "No double-hide flicker (RU-10/ACC-003)"
+        ]
+      },
+      {
+        "id": "unit-14",
+        "title": "8h memory soak + ACC-002 verification",
+        "objective": "Run 1h/4h/8h timepoint baseline measurement on a real high-density room; confirm <20% growth.",
+        "scope": "Manual chrome://task-manager observation + FloodDetector adversarial-burst stress test (CON-018).",
+        "files": [],
+        "functions": [
+          "FC-006"
+        ],
+        "depends_on": [
+          "unit-6",
+          "unit-7"
+        ],
+        "verification": [
+          "Manual: open VTuber/gaming room, run 8h, log memory at 1h/4h/8h",
+          "Manual adversarial test: paste 50K unique-padded danmaku in 30s via console; confirm Map.size capped at 8192 (CON-018)"
+        ],
+        "done_when": [
+          "1h/4h/8h growth < 20% (ACC-002)",
+          "Adversarial burst does not crash tab (CON-018)"
+        ]
+      },
+      {
+        "id": "unit-15",
+        "title": "Final acceptance walkthrough + ACC-006 binary checklist",
+        "objective": "Run all 8 ACC-006 binary items end-to-end and produce final pass/fail log.",
+        "scope": "Walkthrough only; no code changes unless a binary item fails.",
+        "files": [],
+        "functions": [],
+        "depends_on": [
+          "unit-13",
+          "unit-14"
+        ],
+        "verification": [
+          "See browser_checks below; one row per ACC-006 item"
+        ],
+        "done_when": [
+          "All 8 ACC-006 items report PASS (with N/A clauses honored per C2)",
+          "ACC-001 30-minute qualitative pass on user-chosen room"
+        ]
+      }
+    ],
+    "verification_commands": [
+      "pnpm install",
+      "pnpm build",
+      "pnpm lint",
+      "pnpm test",
+      "pnpm test -- tests/normalize.spec.ts (ACC-004 idempotency)",
+      "pnpm test -- tests/whitelist.spec.ts (ACC-005 priority + CON-022 dual-signal + RU-14 PROBATION)",
+      "pnpm test -- tests/classifier.spec.ts (CON-016 multi-label + priority ladder)",
+      "pnpm test -- tests/flood.spec.ts (CON-018 LRU 8192 + per-tick 500 sampling + GC)",
+      "pnpm test -- tests/lifecycle.spec.ts (CON-004 SPA + PR-3 bfcache)",
+      "node scripts/manifest-validate.cjs dist/manifest.json (MV3 schema check)",
+      "du -sh dist/ (RU-13 expects total < 500KB)"
+    ],
+    "browser_checks": [
+      "BC-1 (ACC-006 item 1, streamer 0-denoise): Open a live room, identify a streamer-self message, confirm it is NEVER suppressed regardless of text content.",
+      "BC-2 (ACC-006 item 2, SC 0-denoise): During a SC moment, confirm the SC card is NEVER suppressed.",
+      "BC-3 (ACC-006 item 3, repeat-collapse works): With actionMode=collapse, verify a real flood pattern produces a 'bdd-collapsed-row' showing primaryCategory + count. N/A clause: empty rooms with <3 messages are exempt (per C2).",
+      "BC-4 (ACC-006 item 4, observer disconnect): Switch from room A to room B via in-page navigation; confirm console log shows old observer disconnected and new attached.",
+      "BC-5 (ACC-006 item 5, high-contrast fade-degrade): Enable system 'forced colors' / 'prefers-contrast: more'; with actionMode=fade, confirm visual is hide-equivalent.",
+      "BC-6 (ACC-006 item 6, console no-error): During 30 minutes of a high-density room, confirm chrome devtools console has no error-level messages from this extension.",
+      "BC-7 (ACC-006 item 7, login-state danmaku send normal): While logged in, send a danmaku and confirm it appears in chat normally (RISK-001 mitigation evidence).",
+      "BC-8 (ACC-006 item 8, VTuber 'cao' 50% pass-through): In a VTuber room, count normalizedText==='cao' single-char messages over 30 minutes; confirm at least 50% remain visible (denominator = total occurrences per C2).",
+      "BC-9 (ACC-002 memory soak): chrome://task-manager memory at 1h/4h/8h timepoints; growth < 20%.",
+      "BC-10 (ACC-003 multi-extension): Install Bilibili Helper + Danmaku-Ji concurrently; observe 30 minutes; no error spam, no double-hide flicker.",
+      "BC-11 (ACC-001 qualitative): User-chosen >50 messages/sec room, 30 minutes, subjective 'clean + no missed lottery codes + no false-suppressed streamer'.",
+      "BC-12 (CON-021 typed-CONFIRM): Trigger toxic-category Always-allow; confirm typed-CONFIRM modal forces literal 'CONFIRM' input; rapid-fire >10 attempts in 60s rate-limited.",
+      "BC-13 (CON-019 PROBATION empirical-fill, runs once): During RU-01.5 first dev session, sample 5 rooms (logged-in + logged-out), record medalLevel visibility ratio, set probationSnapshot.mode accordingly."
+    ],
+    "acceptance_checks": [
+      "AC-1 (ACC-001): 30-minute qualitative pass on a >50 msg/sec room with subjective approval.",
+      "AC-2 (ACC-002): 1h/4h/8h memory growth < 20%.",
+      "AC-3 (ACC-003): Multi-extension coexistence with no error spam, no flicker.",
+      "AC-4 (ACC-004): normalizeText idempotency unit tests pass.",
+      "AC-5 (ACC-005): WhitelistEngine 5-role priority unit tests pass.",
+      "AC-6 (ACC-006): All 8 binary checklist items PASS (with C2 N/A clauses honored).",
+      "AC-7 (FPD-4): Static + manifest audit confirms zero outbound calls to *.bilibili.com.",
+      "AC-8 (FPD-3 + CON-022): WhitelistEngine never bypassed; dual-signal forgery test fails to whitelist.",
+      "AC-9 (CON-019/C1): probationSnapshot.medalLevelVisibilityRatio populated; default branch matches measurement (skip if >=0.5, fans-medal-detector-with-penalty if <0.5).",
+      "AC-10 (CON-020): dict/README.md present with documented audit; ToxicDetector disable toggle works."
+    ],
+    "allowed_decisions": [
+      "Choice of FNV-1a vs xxhash for FloodDetector hashing (low-impact)",
+      "Choice of pinyin library (pinyin-pro vs chinese-utils) as long as bundle size < 200KB",
+      "Internal directory grouping inside src/content/classifier/ helpers",
+      "Test runner choice (vitest preferred but jest acceptable if vite-plugin-jest works)",
+      "Specific OffTopicDetector cosine threshold (start conservative, tune via qualitative)",
+      "CSS implementation detail of bdd-collapsed-row (component framework or vanilla)",
+      "Whether to ship a dark theme variant for popup/options (cosmetic)",
+      "Frontend framework for popup/options (vanilla TS, Preact, or React all acceptable)"
+    ],
+    "forbidden_decisions": [
+      "Switching from MV3 to MV2 (FPD-7).",
+      "Switching default actionMode from collapse to hide (FPD-2).",
+      "Implementing fewer than 5 noise categories (FPD-1).",
+      "Introducing any fetch/XHR/WebSocket-write/sendBeacon to *.bilibili.com or any non-local host (FPD-4, CON-010, RU-12).",
+      "Calling any Bilibili report/delete/ban API (FPD-5).",
+      "Using chrome.storage.sync (FPD-13).",
+      "Using display:none for hide mode (CON-008/RU-06).",
+      "Reordering classifier pipeline away from P1 -> Whitelist -> P2 -> 5 detectors (FPD-8/CON-015).",
+      "Single-signal whitelist verification (must be dual-signal per CON-022).",
+      "Auto-Always-allow on toxic without typed-CONFIRM (FPD-10/CON-021).",
+      "Removing PROBATION branch from WhitelistEngine (CON-019/RU-14).",
+      "Loading remote dictionary or remote model at runtime (FPD-4/DROP-003).",
+      "Shipping the zh-Hans dictionary without political-censorship audit (CON-020/RU-13).",
+      "Using `field?: number` optional syntax for medalLevel/guardLevel/role (must be `number | null` or `string | null` per C5).",
+      "Single-store conflation of session-allow and persistent-allow (must be two stores per C6).",
+      "Implementing only DOM layer or only WS layer (must be hybrid per OPT-C; WS default-off but present)."
+    ],
+    "reentry_triggers": [
+      "RT-1: If RU-01.5 finds medalLevel visibility < 50% AND fans-medal-detector-with-penalty also misclassifies > 30% in the dev session, halt coding and reenter Stage F probes.",
+      "RT-2: If Bilibili changes the WS protobuf schema such that ws-hook.ts cannot parse a sample frame, do NOT auto-retry; halt unit-10 and document in unresolved_gaps for next planning pass.",
+      "RT-3: If pnpm install fails on a transitive dep due to a removed-from-registry package, halt unit-1 and reenter to revisit DEP-001.",
+      "RT-4: If during ACC-002 memory measurement, growth exceeds 50% at the 4h mark, halt and reenter to revisit RU-11 / CON-018 caps.",
+      "RT-5: If a Bilibili reverse-engineering counter (RISK-010) actively shadowbans the test account, halt and revisit CON-010 boundary.",
+      "RT-6: If the audited dictionary cannot be reduced under 200KB without losing > 30% of profanity coverage, halt and reenter to revisit RU-13.",
+      "RT-7: If any forbidden_decision is on the verge of being violated (compile-time or design-time), STOP and reenter."
+    ],
+    "unresolved_gaps": []
+  },
+  "canonical_contracts": {
+    "interface_contracts": {
+      "NormalizedDanmakuRecord": "See domain_model.entities.NormalizedDanmakuRecord. Locked by CON-013 + C5 typing rules. RU-02 produces (Phase 1 + Phase 2). RU-03 / RU-07 emit. RU-04 / RU-05 consume.",
+      "NoiseVerdict": "See domain_model.entities.NoiseVerdict. Locked by CON-014 + CON-016 (multi-label string[] + primaryCategory ladder).",
+      "ExtensionSettings": "See domain_model.entities.ExtensionSettings. RU-08 owns; RU-03/05/06/07 consume; chrome.storage.local only.",
+      "DenoisedSessionLog": "See domain_model.entities.DenoisedSessionLog. RU-06 writes; RU-09 reads.",
+      "FloodWindowEntry": "See domain_model.entities.FloodWindowEntry. CON-018 hard caps."
+    },
+    "call_order_contract": "P1 (FC-002 or FC-003) -> FC-004 checkWhitelist -> if WHITELISTED return PASS; else if PROBATION skip detectors + audit; else FC-001 normalize -> FC-005 classify (parallel FC-006..FC-010 + aggregate) -> FC-011 applyAction -> push DenoisedSessionLog if NOISE.",
+    "whitelist_dual_signal": "checkWhitelist requires >=2 corroborating DOM signals from {role, isPaid+ancestor-confirmed, guardLevel>=1, dataset.medalGuard, ancestor.super-chat-message, ancestor.gift-bubble}. Single fans-medal -> PROBATION only.",
+    "normalization_pipeline_order": "BiDi strip (U+202A-202E + U+2066-2069) -> NFKC -> NFC combining-mark fold (U+0300-036F) -> zero-width strip (U+200B-200D + U+FEFF) -> Variation Selector strip (U+FE00-FE0F + U+E0100-E01EF) -> traditional-to-simplified -> pinyin fallback -> emoji alias map. (CON-017)",
+    "primary_category_ladder": "toxic > ad > flood > lowinfo > offtopic. (CON-016/FPD-9)",
+    "storage_quotas": {
+      "alwaysAllowHashes_max_entries": 5000,
+      "alwaysAllow_decay_days": 7,
+      "denoisedSessionLog_max_entries": 1000,
+      "floodMap_max_size": 8192,
+      "flood_per_tick_insert_cap": 500
+    }
+  },
+  "constraint_crosswalk": {
+    "CON-001": [
+      "unit-6 (5 detectors)"
+    ],
+    "CON-002": [
+      "unit-7 (3 action modes; collapse default)"
+    ],
+    "CON-003": [
+      "unit-1.5 (selector registry 4 modes + replay)",
+      "unit-4"
+    ],
+    "CON-004": [
+      "unit-4 (ContextLifecycle)"
+    ],
+    "CON-005": [
+      "unit-3 (normalize Phase 2)"
+    ],
+    "CON-006": [
+      "unit-5 (WhitelistEngine)"
+    ],
+    "CON-007": [
+      "unit-11 (popup/options)"
+    ],
+    "CON-008": [
+      "unit-7 (a11y aria-hidden + prefers-contrast degrade)"
+    ],
+    "CON-009": [
+      "unit-13 (multi-extension)"
+    ],
+    "CON-010": [
+      "unit-12 (ESLint + manifest audit)"
+    ],
+    "CON-011": [
+      "unit-8 (recover panel) + unit-11 (popup badge)"
+    ],
+    "CON-012": [
+      "unit-1 (MV3 manifest)"
+    ],
+    "CON-013": [
+      "unit-2 (types) + C5 nullability"
+    ],
+    "CON-014": [
+      "unit-2"
+    ],
+    "CON-015": [
+      "unit-6 (call-order contract)"
+    ],
+    "CON-016": [
+      "unit-6 (multi-label + ladder)"
+    ],
+    "CON-017": [
+      "unit-3 (BiDi/combining/variation strip steps)"
+    ],
+    "CON-018": [
+      "unit-6 flood.ts + tests/flood.spec.ts"
+    ],
+    "CON-019": [
+      "unit-1.5 + unit-5 PROBATION wiring"
+    ],
+    "CON-020": [
+      "unit-9 (audited dict + README) + unit-6 toxic-disable toggle"
+    ],
+    "CON-021": [
+      "unit-8 (typed-CONFIRM + rate-limit + 7-day decay + bulk-revoke)"
+    ],
+    "CON-022": [
+      "unit-5 (dual-signal verification)"
+    ],
+    "RU-01": [
+      "unit-1"
+    ],
+    "RU-01.5": [
+      "unit-1.5"
+    ],
+    "RU-02": [
+      "unit-3"
+    ],
+    "RU-03": [
+      "unit-4"
+    ],
+    "RU-04": [
+      "unit-5"
+    ],
+    "RU-05": [
+      "unit-6"
+    ],
+    "RU-06": [
+      "unit-7"
+    ],
+    "RU-07": [
+      "unit-10"
+    ],
+    "RU-08": [
+      "unit-2 + unit-11"
+    ],
+    "RU-09": [
+      "unit-8"
+    ],
+    "RU-10": [
+      "unit-13"
+    ],
+    "RU-11": [
+      "unit-6 (flood GC) + unit-14 (memory soak)"
+    ],
+    "RU-12": [
+      "unit-12"
+    ],
+    "RU-13": [
+      "unit-9"
+    ],
+    "RU-14": [
+      "unit-1.5 + unit-5"
+    ],
+    "RU-15": [
+      "unit-3 (P2) + unit-4 (P1) + unit-6 (call-order)"
+    ],
+    "RISK-001": [
+      "unit-12 (ESLint network rule) + BC-7"
+    ],
+    "RISK-002": [
+      "unit-6 (flood caps) + unit-14 (memory soak)"
+    ],
+    "RISK-003": [
+      "unit-10 (WS hook v2 path)"
+    ],
+    "RISK-004": [
+      "unit-9 (RU-13 dictionary)"
+    ],
+    "RISK-005": [
+      "unit-5 (PROBATION) + unit-1.5 (visibility measurement)"
+    ],
+    "RISK-006": [
+      "unit-3 (CON-017 BiDi/combining/variation strip)"
+    ],
+    "RISK-007": [
+      "unit-6 (CON-018 caps) + unit-14 (adversarial burst test)"
+    ],
+    "RISK-008": [
+      "unit-5 (CON-022 dual-signal) + unit-1.5 (PROBATION snapshot)"
+    ],
+    "RISK-009": [
+      "unit-9 (CON-020 audited dict)"
+    ],
+    "RISK-010": [
+      "accepted residual per g-blue rationale; document in README sideload caveats"
+    ],
+    "RISK-011": [
+      "unit-8 (CON-021 safety bars)"
+    ],
+    "ACC-001": [
+      "BC-11"
+    ],
+    "ACC-002": [
+      "BC-9 + unit-14"
+    ],
+    "ACC-003": [
+      "BC-10 + unit-13"
+    ],
+    "ACC-004": [
+      "unit-3 + tests/normalize.spec.ts"
+    ],
+    "ACC-005": [
+      "unit-5 + tests/whitelist.spec.ts"
+    ],
+    "ACC-006": [
+      "BC-1 .. BC-8 + unit-15"
+    ]
+  },
+  "execution_manifest": {
+    "phases": [
+      {
+        "phase": 1,
+        "name": "skeleton + baseline",
+        "units": [
+          "unit-1",
+          "unit-1.5",
+          "unit-2"
+        ]
+      },
+      {
+        "phase": 2,
+        "name": "data + classifier core",
+        "units": [
+          "unit-3",
+          "unit-9"
+        ]
+      },
+      {
+        "phase": 3,
+        "name": "ingest layer",
+        "units": [
+          "unit-4",
+          "unit-5"
+        ]
+      },
+      {
+        "phase": 4,
+        "name": "decision layer",
+        "units": [
+          "unit-6"
+        ]
+      },
+      {
+        "phase": 5,
+        "name": "action + UI",
+        "units": [
+          "unit-7",
+          "unit-8",
+          "unit-11"
+        ]
+      },
+      {
+        "phase": 6,
+        "name": "v2 path",
+        "units": [
+          "unit-10"
+        ]
+      },
+      {
+        "phase": 7,
+        "name": "guards + acceptance",
+        "units": [
+          "unit-12",
+          "unit-13",
+          "unit-14",
+          "unit-15"
+        ]
+      }
+    ],
+    "critical_path": [
+      "unit-1",
+      "unit-1.5",
+      "unit-2",
+      "unit-3",
+      "unit-4",
+      "unit-5",
+      "unit-6",
+      "unit-7",
+      "unit-8",
+      "unit-15"
+    ],
+    "non_blocking_parallel": [
+      "unit-9 (can run alongside unit-2/3)",
+      "unit-12 (any time after unit-1)",
+      "unit-13 (post unit-7)",
+      "unit-10 (post unit-6)"
+    ]
+  },
+  "code_batches": {
+    "batch_1_skeleton": {
+      "units": [
+        "unit-1",
+        "unit-1.5",
+        "unit-2"
+      ],
+      "exit_criteria": "Extension loads in chrome://extensions; selectorRegistry.verifiedAt populated; types module exports all entities; settings round-trip works."
+    },
+    "batch_2_pipeline_core": {
+      "units": [
+        "unit-3",
+        "unit-4",
+        "unit-5",
+        "unit-9"
+      ],
+      "exit_criteria": "Phase-2 normalize idempotent; observer emits records; whitelist dual-signal + PROBATION pass tests; dictionary packaged."
+    },
+    "batch_3_decision_and_action": {
+      "units": [
+        "unit-6",
+        "unit-7"
+      ],
+      "exit_criteria": "Five detectors pass + multi-label aggregation + 3 action modes work end-to-end on a real room."
+    },
+    "batch_4_ux_and_v2": {
+      "units": [
+        "unit-8",
+        "unit-11",
+        "unit-10"
+      ],
+      "exit_criteria": "Recover panel + popup + options + WS hook (default off) all functional."
+    },
+    "batch_5_guards_and_acceptance": {
+      "units": [
+        "unit-12",
+        "unit-13",
+        "unit-14",
+        "unit-15"
+      ],
+      "exit_criteria": "ESLint network rule passes; multi-extension coexistence clean; 8h memory growth <20%; ACC-006 8 binary items all PASS."
+    }
+  },
+  "code_preflight": {
+    "confirmed_repo_facts": {
+      "repo_root": "/Users/lddmay/AiCoding/bonfire-test/bilibili-danmaku-denoiser-clean",
+      "current_state": "Empty git repo, master branch, no commits, no source files. Only .bonfire/ scaffold present (FACT-001).",
+      "user_request_verbatim": "做一个 B 站直播间弹幕降噪 Chrome 插件 (FACT-002).",
+      "git_user": "zhangbeifan",
+      "branch": "master",
+      "no_node_modules": true,
+      "no_package_json": true,
+      "no_manifest_json": true
+    },
+    "do_not_reinterpret": [
+      "Default action is collapse-with-count, NOT hide (CON-002/FPD-2). Do not 'simplify' to hide-by-default.",
+      "All 5 noise categories are mandatory (CON-001/FPD-1). Do not ship 3 and call it MVP.",
+      "Whitelist requires >=2 DOM signals (CON-022). Do not single-signal-trust isPaid alone.",
+      "Normalization order is fixed by CON-017. Do not 'optimize' by removing BiDi or combining-mark steps.",
+      "Classifier pipeline is P1 -> Whitelist -> P2 -> 5 detectors (FPD-8/CON-015). Whitelist runs BEFORE Phase-2.",
+      "MV3 only. No MV2 fallback (FPD-7).",
+      "100% local. No fetch/XHR to *.bilibili.com (FPD-4, CON-010, RU-12). The WS hook only READS frames.",
+      "Toxic Always-allow requires typed-CONFIRM (FPD-10/CON-021). Do not silently skip the modal.",
+      "Hide mode uses aria-hidden + visibility:hidden, NEVER display:none (CON-008/RU-06).",
+      "field-missing uses null, NOT undefined or `?: number` (C5).",
+      "session-allow vs persistent-allow are TWO stores (C6). Do not collapse to one."
+    ],
+    "do_first": [
+      "Run unit-1 (skeleton) end-to-end before writing any classifier logic.",
+      "Run unit-1.5 dev session BEFORE writing whitelist final defaults; the empirical-fill drives RU-14 default branch.",
+      "Read the 4 INABILITY_TO_PROBE notes in case.json#stages.probes.probes and treat their mitigations as binding implementation choices."
+    ],
+    "context_bundle": [
+      ".bonfire/truth-surface/constraint-ledger-snapshot.json (22 frozen CONs + 11 OPEN RISKs + 6 ACCs)",
+      ".bonfire/case.json#stages.preprocess.frozen_for_code (7 frozen-for-code lines)",
+      ".bonfire/case.json#stages.requirements.requirement_units (RU-01..12)",
+      ".bonfire/case.json#stages.closure.added_units_post_critique (RU-13..15)",
+      ".bonfire/case.json#stages.closure.execution_chain (call sequence)",
+      ".bonfire/case.json#stages.review.preserved_h_review_intent.conditions_dropped_due_to_orphan_tokens (C1..C7 BINDING)",
+      ".bonfire/plan/bonfire-d-critique-delta.json",
+      ".bonfire/plan/bonfire-g-red-delta.json",
+      ".bonfire/plan/bonfire-g-blue-delta.json"
+    ],
+    "current_focus": "unit-1.5 + unit-2",
+    "progress_snapshot": "Stages A-J complete. 22 CONs frozen. 11 RISKs OPEN-but-bounded. ACCs/RUs locked. Awaiting /bonfire:code execution.",
+    "remaining_work": "All 15 implementation units (unit-1 through unit-15) plus unit-1.5 empirical baseline.",
+    "session_notes": "H-Review verdict file is vacuous due to known apply-h-rulings + state-advance Layer 2b orphan-token blockage. The real conditions C1..C7 are preserved at case.json#stages.review.preserved_h_review_intent and are BINDING for J-Compile output (incorporated above).",
+    "blockers": [],
+    "pause_conditions": [
+      "Reentry triggers RT-1 through RT-7 (see handoff.reentry_triggers).",
+      "Any forbidden_decision violation pressure.",
+      "Bilibili schema or DOM change that breaks selector registry beyond simple selector edits."
+    ]
+  },
+  "compile_summary": "Compiled 22 frozen CONs, 11 bounded OPEN RISKs, 6 ACCs, and 15 RUs (RU-01..15) plus the H-Review preserved C1..C7 conditions into a single code-ready handoff. Architecture is OPT-C Hybrid Layered: DOM default + opt-in WS hook sharing one classifier. 15 implementation units organized into 7 execution phases / 5 code batches. 16 function contracts and a 38-entry file plan concretely realize C3's required paths. Domain model, data contract, and UI contract sections are populated with concrete entity/field/state definitions tied 1:1 to ledger CONs. Storage is chrome.storage.local only with documented quotas. ESLint custom rule + manifest audit lock the censorship-adjacency boundary. unit-1.5 first-session empirical-fill resolves the 4 INABILITY_TO_PROBE gaps without blocking the pipeline. unresolved_gaps is empty; code_ready=true.",
+  "final_handoff": "Code-ready. The next /bonfire:code agent should execute batches 1->5 in order, starting with unit-1 (skeleton) and unit-1.5 (empirical baseline) before any classifier code. All forbidden_decisions are immutable; allowed_decisions enumerate the only safe drift. Reentry triggers RT-1..RT-7 must halt coding and return to planning."
+}

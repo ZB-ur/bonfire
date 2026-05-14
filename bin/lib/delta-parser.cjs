@@ -1,6 +1,7 @@
 'use strict';
 
 const { loadSchema } = require('./utils.cjs');
+const { isEmptyOrPlaceholder } = require('./validation-helpers.cjs');
 
 function validateDelta(agentName, delta) {
   const schema = loadSchema();
@@ -32,6 +33,19 @@ function validateDelta(agentName, delta) {
   if (constraints.verdict_enum && delta.verdict !== undefined) {
     if (!constraints.verdict_enum.includes(delta.verdict)) {
       errors.push(`verdict must be one of [${constraints.verdict_enum.join(', ')}], got "${delta.verdict}"`);
+    }
+  }
+
+  if (constraints.ruling_action_enum && Array.isArray(delta.rulings)) {
+    for (let i = 0; i < delta.rulings.length; i++) {
+      const item = delta.rulings[i];
+      if (item && typeof item === 'object' && !Array.isArray(item) && item.action !== undefined) {
+        if (!constraints.ruling_action_enum.includes(item.action)) {
+          errors.push(
+            `rulings[${i}].action must be one of [${constraints.ruling_action_enum.join(', ')}], got "${item.action}"`
+          );
+        }
+      }
     }
   }
 
@@ -70,6 +84,64 @@ function validateDelta(agentName, delta) {
               `conditions[${i}].target_stage "${item.target_stage}" ` +
               `not in [${shape.target_stage_enum.join(', ')}]`
             );
+          }
+        }
+        if (shape.field_substantive_check) {
+          for (const [fieldName, rule] of Object.entries(shape.field_substantive_check)) {
+            if (rule.isEmptyOrPlaceholder === false && isEmptyOrPlaceholder(item[fieldName])) {
+              errors.push(
+                `conditions[${i}].${fieldName} is empty or placeholder ` +
+                `(value="${item[fieldName] === undefined ? 'undefined' : item[fieldName]}")`
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (constraints.ruling_item_shape && delta.rulings !== undefined) {
+    const shape = constraints.ruling_item_shape;
+    if (!Array.isArray(delta.rulings)) {
+      errors.push('rulings must be an array when present');
+    } else {
+      const ledgerPattern = schema.ledger_id_pattern;
+      const ledgerRefRe = ledgerPattern ? new RegExp(`^${ledgerPattern}$`) : null;
+      for (let i = 0; i < delta.rulings.length; i++) {
+        const item = delta.rulings[i];
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+          errors.push(`rulings[${i}] must be an object`);
+          continue;
+        }
+        for (const required of (shape.required_fields || [])) {
+          if (item[required] === undefined || item[required] === null) {
+            errors.push(`rulings[${i}] missing required field: ${required}`);
+          }
+        }
+        if (shape.id_constraint === 'ledger_ref' && item.id && ledgerRefRe) {
+          if (!ledgerRefRe.test(item.id)) {
+            errors.push(
+              `rulings[${i}].id "${item.id}" does not match ledger_id_pattern`
+            );
+          }
+        }
+        const action = item.action;
+        if (shape.action_specific_required_fields && action && shape.action_specific_required_fields[action]) {
+          for (const required of shape.action_specific_required_fields[action]) {
+            if (item[required] === undefined || item[required] === null) {
+              errors.push(`rulings[${i}] (action=${action}) missing required field: ${required}`);
+            }
+          }
+        }
+        if (shape.field_substantive_check) {
+          for (const [fieldName, rule] of Object.entries(shape.field_substantive_check)) {
+            if (rule.applies_when_action && rule.applies_when_action !== action) continue;
+            if (rule.isEmptyOrPlaceholder === false && isEmptyOrPlaceholder(item[fieldName])) {
+              errors.push(
+                `rulings[${i}].${fieldName} is empty or placeholder ` +
+                `(value="${item[fieldName] === undefined ? 'undefined' : item[fieldName]}")`
+              );
+            }
           }
         }
       }

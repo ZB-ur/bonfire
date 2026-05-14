@@ -1,0 +1,24 @@
+{
+  "run_id": "run-2026-05-08-dogfood",
+  "verdict": "partial",
+  "global_verification_summary": {
+    "pnpm_install": "passed",
+    "pnpm_build": "passed (dist/ 72K, MV3 manifest valid)",
+    "pnpm_test": "passed (15/15 tests/shared)",
+    "pnpm_lint": "passed",
+    "pnpm_typecheck": "passed"
+  },
+  "browser_checks": "skipped — require Chrome GUI on real Bilibili rooms; out of scope for headless dogfood test",
+  "acceptance_checks_status": {
+    "AC-1 (ACC-001 qualitative)": "not_run — needs live Bilibili room",
+    "AC-2 (ACC-002 8h memory)": "not_run — needs live session",
+    "AC-3 (ACC-003 multi-extension)": "not_run — needs Chrome GUI",
+    "AC-4 (ACC-004 normalize idempotency)": "not_run — unit-3 normalize.ts not implemented in dogfood scope",
+    "AC-5 (ACC-005 whitelist priority)": "not_run — unit-5 whitelist.ts not implemented",
+    "AC-6 (ACC-006 8-item binary checklist)": "not_run — needs live Bilibili rooms",
+    "AC-7 (FPD-4 zero outbound calls)": "passed — static check + ESLint guard in place",
+    "AC-8 (FPD-3 + CON-022 dual-signal)": "not_run — unit-5 not implemented",
+    "AC-9 (CON-019 PROBATION)": "not_run — unit-1.5 + unit-5 not implemented",
+    "AC-10 (CON-020 dict)": "not_run — unit-9 not implemented"
+  }
+}

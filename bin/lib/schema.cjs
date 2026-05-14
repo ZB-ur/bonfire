@@ -60,8 +60,18 @@ function validateHandoff(compileOutput, context) {
     errors.push('handoff.implementation_units is empty');
   }
 
+  // ASSERTION-3a deep-check (runs BEFORE Layer 2a per spec §6.7 IP1) — defeats
+  // L0-L3 attacks (empty containers / [{}] / empty subfields / placeholder strings).
+  // Honors no_substantive_contract escape valve via ref-only validateLedgerRef.
+  const schema = loadSchema();
+  const ctx = context || {};
+  const deepResult = deepCheckHandoffSubstantiveSlots(handoff, schema, ctx.snapshot);
+  if (!deepResult.valid) {
+    errors.push(`deep_check_failed at ${deepResult.slot}: ${deepResult.error}`);
+  }
+
   // Layer 2a: provenance enforcement
-  const provenanceErrors = validateProvenance(compileOutput, context || {});
+  const provenanceErrors = validateProvenance(compileOutput, ctx);
   errors.push(...provenanceErrors);
 
   return { valid: errors.length === 0, errors };
@@ -71,6 +81,10 @@ function validateProvenance(compileOutput, context) {
   const errors = [];
   const schema = loadSchema();
   const slots = (schema && schema.handoff_substantive_slots) || {};
+  // Extract layer_2b_calibration once per validateHandoff invocation (per
+  // round-4 quality-review S2 fix: avoid per-slot loadSchema disk reads).
+  // Threaded into checkEntryProvenance via parameter; constant for full run.
+  const calib = (schema && schema.layer_2b_calibration) || null;
 
   for (const [slotPath, slotConfig] of Object.entries(slots)) {
     if (!slotConfig || !slotConfig._provenance_required) continue;
@@ -87,11 +101,11 @@ function validateProvenance(compileOutput, context) {
       const entries = Array.isArray(target) ? target : Object.entries(target).map(([k, v]) => v);
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
-        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context, slotConfig);
+        const entryErrors = checkEntryProvenance(entry, `${slotPath}[${i}]`, context, slotConfig, calib);
         errors.push(...entryErrors);
       }
     } else if (slotConfig.kind === 'whole_section') {
-      const sectionErrors = checkEntryProvenance(target, slotPath, context, slotConfig);
+      const sectionErrors = checkEntryProvenance(target, slotPath, context, slotConfig, calib);
       errors.push(...sectionErrors);
     }
   }
@@ -109,7 +123,7 @@ function resolveSlotPath(root, dottedPath) {
   return current;
 }
 
-function checkEntryProvenance(entry, pathLabel, context, slotConfig) {
+function checkEntryProvenance(entry, pathLabel, context, slotConfig, calib) {
   const errors = [];
   if (!entry || typeof entry !== 'object') {
     errors.push(`${pathLabel}: not an object (can't validate provenance)`);
@@ -163,28 +177,63 @@ function checkEntryProvenance(entry, pathLabel, context, slotConfig) {
     sourceText = cond.text || '';
   }
 
-  // Layer 2b: token coverage — after Layer 2a resolves the source, extract
-  // substantive tokens from the slot content and compare against source text.
-  const { compareTokens } = require('./seam-validation.cjs');
+  // Layer 2b: round-4 max_contiguous_orphan_run threshold reject.
+  const { maxContiguousOrphanRun, compareTokens } = require('./seam-validation.cjs');
   const slotTokens = extractEntryTokens(entry, slotConfig);
-  const orphans = compareTokens(slotTokens, sourceText);
-  if (orphans.length > 0) {
-    const preview = orphans.slice(0, 10).join(', ');
-    const more = orphans.length > 10 ? ` (+${orphans.length - 10} more)` : '';
-    errors.push(`${pathLabel}: orphan tokens not in source (${kind}=${JSON.stringify(ref)}): ${preview}${more}`);
+
+  // Round-4 v0.1 telemetry omitted: per spec §5 R-A amend, telemetry is
+  // "compute-only no persistence"; pure-function compute with discarded
+  // result has zero observable effect. Re-analysis at amend time uses
+  // analyze-round-4.js on archived data per rationale (a). Reintroduce
+  // here if Q5 §6.4 trigger materializes a runtime consumer.
+
+  // Round-4 reject: max_contiguous_orphan_run > threshold (per spec §5 + §6.2).
+  // calib threaded from validateProvenance (extracted once per handoff
+  // invocation per quality-review S2 fix; avoids per-slot loadSchema reads).
+  if (calib && typeof calib.threshold_provisional === 'number') {
+    // Source-of-truth assertion (per spec §6.1): warn on drift at call time.
+    // Guard on p75_baseline + safety_margin_pct typeof per quality-review S1
+    // fix: prevents NaN-flood when those fields are absent from schema config.
+    if (typeof calib.p75_baseline === 'number' && typeof calib.safety_margin_pct === 'number') {
+      const expected = Math.round(calib.p75_baseline * (1 + calib.safety_margin_pct / 100));
+      if (calib.threshold_provisional !== expected) {
+        process.stderr.write(
+          `[layer_2b_calibration] WARN: threshold_provisional=${calib.threshold_provisional} ` +
+          `differs from derived ${expected} (p75_baseline=${calib.p75_baseline} × ` +
+          `(1 + ${calib.safety_margin_pct}/100)). Schema PR may have updated baseline ` +
+          `without atomic threshold update; see spec §6.1 source-of-truth contract.\n`
+        );
+      }
+    }
+    const maxRun = maxContiguousOrphanRun(slotTokens, sourceText);
+    if (maxRun > calib.threshold_provisional) {
+      const allOrphans = compareTokens(slotTokens, sourceText);
+      const preview = allOrphans.slice(0, 5).join(', ');
+      const moreCount = allOrphans.length > 5 ? ` +${allOrphans.length - 5} more` : '';
+      errors.push(
+        `${pathLabel}: max_contiguous_orphan_run=${maxRun} > threshold=${calib.threshold_provisional} ` +
+        `(${kind}=${JSON.stringify(ref)}; metric_class=${calib.metric_class}; ` +
+        `threshold_status=${calib.threshold_status}; orphan_sample=[${preview}${moreCount}])`
+      );
+    }
   }
+  // Note: if calib is absent (schema not yet round-4), Layer 2b reject is SILENT
+  // (no rejection). This is defensive: handoff still passes Layer 2a + 3a checks.
+  // Schema PR landing layer_2b_calibration is required to activate round-4 reject.
 
   return errors;
 }
 
 // Extract substantive tokens from an entry's string leaves for Layer 2b
-// comparison. Honors `slotConfig.fields` at the top level — when present,
-// only the listed top-level keys are walked. Always skips `source_kind`
-// and `source_ref` (provenance metadata, never substantive content).
+// comparison. Honors `slotConfig.required_subfields` at the top level — when
+// present, only the listed top-level keys are walked. Always skips
+// `source_kind` and `source_ref` (provenance metadata, never substantive
+// content). Schema v2 renamed `fields` to `required_subfields` for stronger
+// contract semantics (per ASSERTION-3a spec §6.3 + §6.8).
 function extractEntryTokens(entry, slotConfig) {
   const { extractSubstantiveTokens } = require('./seam-validation.cjs');
   const tokens = [];
-  const fields = (slotConfig && Array.isArray(slotConfig.fields)) ? slotConfig.fields : null;
+  const fields = (slotConfig && Array.isArray(slotConfig.required_subfields)) ? slotConfig.required_subfields : null;
 
   function walk(value, path) {
     if (value == null) return;
@@ -209,6 +258,143 @@ function extractEntryTokens(entry, slotConfig) {
   return tokens;
 }
 
+/**
+ * deepCheckHandoffSubstantiveSlots(handoff, schema, ledgerSnapshot)
+ *
+ * Per ASSERTION-3a spec §6.3 + §6.7 IP1. Runs structural deep-check on every
+ * slot in schema.handoff_substantive_slots. Defeats attack levels L0-L3
+ * (empty containers, [{}], empty/null subfields, placeholder strings); L4
+ * prose-vacuous content is OOS (round-4 territory).
+ *
+ *   per_entry kind: assert entries.length >= min_entries (default 1); for each
+ *     entry, assert required_subfields all present and !isEmptyOrPlaceholder.
+ *   whole_section kind: assert required_subfields all present and
+ *     !isEmptyOrPlaceholder on the section object.
+ *
+ * Escape valve (existing handoff_mandate_params.escape_valve) supports the
+ * legitimate "no substantive contract" case. When the slot's container has
+ * the escape flag (`no_substantive_contract: true`) AND the reason field
+ * resolves via validateLedgerRef per the schema's reason_ref_constraint
+ * mechanism (DQ-1 closure: ref-only check, NO Layer 2b prose token-coverage),
+ * the slot's deep-check is skipped.
+ *
+ * Fail-fast on first violation. Returns {valid, error?, slot?, escape_used?}.
+ */
+function deepCheckHandoffSubstantiveSlots(handoff, schema, ledgerSnapshot) {
+  const { isEmptyOrPlaceholder, validateLedgerRef } = require('./validation-helpers.cjs');
+  const slots = (schema && schema.handoff_substantive_slots) || {};
+  const params = (schema && schema.handoff_mandate_params) || {};
+  const escapeCfg = params.escape_valve || {};
+  const escapeFlag = escapeCfg.flag || 'no_substantive_contract';
+  const escapeReasonField = escapeCfg.reason_field || 'no_substantive_contract_reason';
+  const escapeMinRefs = escapeCfg.min_refs || 1;
+
+  for (const [slotPath, config] of Object.entries(slots)) {
+    // slotPath like "handoff.domain_model.entities" — strip leading "handoff." then dotted-path-resolve.
+    const segments = slotPath.split('.').slice(1);
+    const slot = resolveSlotPath(handoff, segments.join('.'));
+    // Container = parent of the slot. If slot is at handoff top-level (e.g.,
+    // "handoff.function_contracts"), container is the handoff root itself.
+    const container = segments.length > 1
+      ? resolveSlotPath(handoff, segments.slice(0, -1).join('.'))
+      : handoff;
+
+    // Skip-if-undefined convention (matches validateProvenance:78). Catches
+    // operators who EMPTY a present slot (the dogfood vacuous-pass attack);
+    // does not require every slot to be present (some handoffs legitimately
+    // lack ui_contract sections, etc.). Explicit absence is allowed; explicit
+    // emptiness is the attack signature.
+    if (slot === undefined) continue;
+
+    // Escape valve check on container — if set, validate refs and skip slot deep-check.
+    if (container && container[escapeFlag] === true) {
+      const reason = container[escapeReasonField];
+      const refResult = validateLedgerRef(
+        reason,
+        schema,
+        ledgerSnapshot || { entries: {} },
+        escapeMinRefs,
+      );
+      if (!refResult.valid) {
+        return {
+          valid: false,
+          slot: slotPath,
+          error: `escape valve "${escapeFlag}" invoked but invalid: ${refResult.error}`,
+        };
+      }
+      continue;  // escape valid — skip deep-check on this slot
+    }
+
+    if (config.kind === 'per_entry') {
+      // Accept either an array (preferred shape) or a plain object (entries-by-key).
+      const entries = Array.isArray(slot)
+        ? slot
+        : (slot && typeof slot === 'object' ? Object.values(slot) : null);
+      if (entries === null) {
+        return {
+          valid: false,
+          slot: slotPath,
+          error: `${slotPath}: expected array or object, got ${typeof slot}`,
+        };
+      }
+      const minEntries = config.min_entries || 1;
+      if (entries.length < minEntries) {
+        return {
+          valid: false,
+          slot: slotPath,
+          error: `${slotPath} has ${entries.length} entries, min_entries=${minEntries}`,
+        };
+      }
+      const required = config.required_subfields || [];
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (typeof entry !== 'object' || entry === null) {
+          return {
+            valid: false,
+            slot: slotPath,
+            error: `${slotPath}[${i}]: expected object`,
+          };
+        }
+        for (const field of required) {
+          if (isEmptyOrPlaceholder(entry[field])) {
+            return {
+              valid: false,
+              slot: slotPath,
+              error: `${slotPath}[${i}].${field} is empty or placeholder`,
+            };
+          }
+        }
+      }
+    } else if (config.kind === 'whole_section') {
+      if (typeof slot !== 'object' || slot === null || Array.isArray(slot)) {
+        return {
+          valid: false,
+          slot: slotPath,
+          error: `${slotPath}: expected object (whole_section)`,
+        };
+      }
+      const required = config.required_subfields || [];
+      for (const field of required) {
+        if (isEmptyOrPlaceholder(slot[field])) {
+          return {
+            valid: false,
+            slot: slotPath,
+            error: `${slotPath}.${field} is empty or placeholder`,
+          };
+        }
+      }
+    } else {
+      return {
+        valid: false,
+        slot: slotPath,
+        error: `${slotPath}: unknown kind "${config.kind}"`,
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
 function validateBundle(root) {
   const schema = loadSchema();
   if (!schema) return { present: [], missing: [], errors: ['Cannot load schema'] };
@@ -231,4 +417,4 @@ function validateBundle(root) {
   return { present, missing, errors: [] };
 }
 
-module.exports = { validateHandoff, validateBundle };
+module.exports = { validateHandoff, validateBundle, deepCheckHandoffSubstantiveSlots };

@@ -1,0 +1,20 @@
+{
+  "bundle_version": 1,
+  "title": null,
+  "created_at": "2026-05-07T14:41:55.260Z",
+  "source_request": "做一个 B 站直播间弹幕降噪 Chrome 插件",
+  "project_paths": {
+    "root": "/Users/lddmay/AiCoding/bonfire-test/bilibili-danmaku-denoiser"
+  },
+  "stages": {
+    "preprocess": null,
+    "divergence": null,
+    "requirements": null,
+    "critique": null,
+    "closure": null,
+    "probes": null,
+    "red_blue": null,
+    "review": null,
+    "compile_for_code": null
+  }
+}

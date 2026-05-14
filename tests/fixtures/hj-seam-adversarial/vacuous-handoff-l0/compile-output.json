@@ -1,0 +1,23 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "L0 vacuous-pass attack",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "unit-1" }],
+    "domain_model": {
+      "entities": []
+    },
+    "function_contracts": [],
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-001"
+    },
+    "ui_contract": {
+      "panels": [],
+      "state_ownership": {},
+      "empty_states": {},
+      "error_states": {}
+    }
+  }
+}

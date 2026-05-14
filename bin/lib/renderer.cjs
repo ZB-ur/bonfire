@@ -280,6 +280,12 @@ function renderNote(root, noteId, opts) {
   // Preprocess data (note-specific transformations)
   data = preprocessData(noteId, data);
 
+  // Inject runtime context from opts (run_id) so templates with {{run_id}}
+  // resolve cleanly. Source-data fields win on collision.
+  if (opts.run_id !== undefined) {
+    data = Object.assign({ run_id: opts.run_id }, data);
+  }
+
   // Render
   const rendered = renderTemplate(templateContent, data);
 

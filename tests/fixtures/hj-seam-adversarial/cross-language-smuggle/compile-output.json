@@ -8,7 +8,9 @@
     "ui_contract": {
       "panels": {
         "Home": {
-          "description": "开始训练 和 重置统计",
+          "description": "设置 模块 功能 界面 系统 数据 处理 存储 查询 显示 输出 输入 控制 管理 配置 参数 结果 状态 操作 流程 测试 验证 报告 记录 分析 统计 比较 计算 转换 执行 运行",
+          "elements": "chinese language",
+          "states": "ui throughout",
           "source_kind": "ledger_direct",
           "source_ref": "CON-007"
         }

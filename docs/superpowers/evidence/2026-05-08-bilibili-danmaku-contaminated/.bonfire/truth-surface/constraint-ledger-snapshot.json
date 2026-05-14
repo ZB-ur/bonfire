@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "replayed_at": "2026-05-07T15:21:25.067Z",
+  "event_count": 16,
+  "entries": {
+    "CON-001": {
+      "id": "CON-001",
+      "category": "confirmed_fact",
+      "content": "MV3 is the only currently-supported manifest version for new Chrome Web Store submissions; MV2 deprecated. Background script replaced by non-persistent service worker (idle-killable ~30s).",
+      "status": "PROPOSED",
+      "source": "reality-checker",
+      "rationale": "Chrome Web Store policy and MV3 service-worker lifecycle are documented platform behaviors as of 2024+.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T14:48:52.199Z",
+      "updated_at": "2026-05-07T14:48:52.199Z"
+    },
+    "CON-002": {
+      "id": "CON-002",
+      "category": "confirmed_fact",
+      "content": "Bilibili livestream danmaku is delivered via WebSocket from a chat/broadcast server. Protocol is reverse-engineered community knowledge, not a published stable API; framing/compression/auth have changed across deploys.",
+      "status": "PROPOSED",
+      "source": "reality-checker",
+      "rationale": "Public observation; treat as moving target.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T14:48:52.276Z",
+      "updated_at": "2026-05-07T14:48:52.276Z"
+    },
+    "CON-003": {
+      "id": "CON-003",
+      "category": "confirmed_fact",
+      "content": "Two viable intercept points: (a) MAIN-world WebSocket monkey-patch (pre-render, fragile to protocol drift), (b) MutationObserver on rendered DOM (post-render with flicker risk, fragile to selector drift). Hybrid is possible.",
+      "status": "PROPOSED",
+      "source": "reality-checker",
+      "rationale": "Architectural reality the user will hit no matter the noise-definition choice.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T14:48:52.352Z",
+      "updated_at": "2026-05-07T14:48:52.352Z"
+    },
+    "CHA-001": {
+      "id": "CHA-001",
+      "category": "challenged_claim",
+      "content": "Implicit user assumption: 'noise reduction' is a single well-defined feature. Reality: 'noise' spans 5+ classes (spam/repeat, low-info, off-topic, toxicity, advertising) needing different mechanisms (regex/list, frequency, semantic, classifier, sender-reputation). One engine cannot cover all five at the same accuracy/cost.",
+      "status": "CHALLENGED",
+      "source": "reality-checker",
+      "rationale": "Drives v1 scope; without scoping which class, no defined success criterion.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": "Resolved 2026-05-07 by user selecting A+B+C explicit multi-class scope; see RGOAL-001/002/003 + DROP-001. Status remains CHALLENGED only because no Stage-A CLI path exists to mark CHALLENGED→resolved (CLI gap, dogfood finding).",
+      "superseded_by": null,
+      "created_at": "2026-05-07T14:48:52.429Z",
+      "updated_at": "2026-05-07T15:16:47.162Z"
+    },
+    "RISK-001": {
+      "id": "RISK-001",
+      "category": "high_impact_risk",
+      "content": "Failure-mode policy on Bilibili-side drift (selector or WS schema change) is unspecified. Silent fail-open and silent fail-closed are both user-hostile in opposite directions. Without explicit policy, the dogfood ships in a state where user cannot tell if filter worked or filter died — making 'visibly cleaner' acceptance test undecidable.",
+      "status": "OPEN",
+      "source": "blind-spot-scout",
+      "rationale": "Scout's synthesis observation: every other behavioral question is a special case of this meta-question.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T14:48:52.509Z",
+      "updated_at": "2026-05-07T14:48:52.509Z"
+    },
+    "RGOAL-001": {
+      "id": "RGOAL-001",
+      "category": "retained_goal",
+      "content": "v1 noise class A — 重复刷屏 dedup (PRIMARY axis). Hash/burst-collapse high-frequency repeats: '6666', '哈哈哈哈', copy-paste raids. Dedup window-based (TBD: wall-clock vs message-count). Output modality: cluster-and-count — 首条保留, 后续凝成 '6666 ×N' 实时增量计数 (preserves crowd-cheer atmosphere).",
+      "status": "PROPOSED",
+      "source": "user",
+      "rationale": "User-confirmed primary noise class. Highest user-perceived value, simplest mechanism.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:15:22.979Z",
+      "updated_at": "2026-05-07T15:21:24.895Z"
+    },
+    "RGOAL-002": {
+      "id": "RGOAL-002",
+      "category": "retained_goal",
+      "content": "v1 noise class B — 低质量短弹幕 filter. Single-emoji, 1-2 char, gibberish. Mechanism: length/entropy heuristic, hand-tuned threshold.",
+      "status": "PROPOSED",
+      "source": "user",
+      "rationale": "User-confirmed secondary noise class. Per-message classifier, deterministic.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": "DEFERRED to v1.1+ per user 2026-05-07. Not in v1 acceptance scope. See ASEM-001 for v1 scope statement.",
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:15:23.061Z",
+      "updated_at": "2026-05-07T15:19:08.883Z"
+    },
+    "RGOAL-003": {
+      "id": "RGOAL-003",
+      "category": "retained_goal",
+      "content": "v1 noise class C — 偏题/引战/广告 filter. Mechanism TBD: keyword/regex blocklist (manual) vs ML/semantic (heavy). Priority below A and B.",
+      "status": "PROPOSED",
+      "source": "user",
+      "rationale": "User-confirmed third noise class. Mechanism choice deferred — must answer ML-vs-rules question downstream.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": "DEFERRED to v1.2+ per user 2026-05-07. Not in v1 acceptance scope. Mechanism (rules vs ML) decision deferred with the goal. See ASEM-001 for v1 scope statement.",
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:15:23.140Z",
+      "updated_at": "2026-05-07T15:19:08.965Z"
+    },
+    "DROP-001": {
+      "id": "DROP-001",
+      "category": "discarded_option",
+      "content": "Class D pure rate-limiting / volume sampler (regardless of message content) — explicitly out of v1 scope per user.",
+      "status": "DISCARDED",
+      "source": "user",
+      "rationale": "User did not select D; closing scope explicitly to anchor non-goals.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:15:23.219Z",
+      "updated_at": "2026-05-07T15:15:23.219Z"
+    },
+    "ASEM-001": {
+      "id": "ASEM-001",
+      "category": "acceptance_semantic",
+      "content": "v1 acceptance scope is RGOAL-001 only (dedup of high-frequency repeats). RGOAL-002 (low-info filter) and RGOAL-003 (off-topic/inflammatory/ad filter) are PROPOSED-but-deferred to post-v1 backlog. v1 'visibly cleaner' acceptance bar must be reachable from RGOAL-001 alone.",
+      "status": "PROPOSED",
+      "source": "user",
+      "rationale": "Phased delivery: v1 ships dedup only; B and C deferred to v1.1+/v1.2+. Lowers v1 effort, makes acceptance criterion testable on a single mechanism.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:19:09.046Z",
+      "updated_at": "2026-05-07T15:19:09.046Z"
+    },
+    "CON-004": {
+      "id": "CON-004",
+      "category": "frozen_constraint",
+      "content": "v1 implementation surface coverage limited to Bilibili chat-list sidebar (DOM-rendered message list). Canvas/WebGL danmaku overlay rendering layer is OUT of v1 scope — cluster-and-count cannot be performed there from a Chrome extension because rendered danmaku instances are not exposed. v1 acceptance applies only to chat-list sidebar.",
+      "status": "PROPOSED",
+      "source": "user",
+      "rationale": "Forced by Q3 = cluster-and-count output modality. Canvas overlay would require either (a) intercepting WS frames pre-render and reconstructing the overlay (out of scope for v1 effort budget), or (b) DOM-overlay manipulation which Bilibili's renderer does not support hooking into externally.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:21:24.986Z",
+      "updated_at": "2026-05-07T15:21:24.986Z"
+    },
+    "DROP-002": {
+      "id": "DROP-002",
+      "category": "discarded_option",
+      "content": "Output modalities A=Drop (display:none) and C=Progressive-fade — rejected in favor of B=cluster-and-count. A drops crowd-cheer atmosphere; C has CSS opacity timing complexity matching B's effort but produces a visually weaker signal.",
+      "status": "DISCARDED",
+      "source": "user",
+      "rationale": "User selected B per Q3 2026-05-07 with explicit acknowledgment of surface tradeoff.",
+      "challenged_by": [],
+      "aligned_by": [],
+      "evidence_refs": [],
+      "notes": null,
+      "superseded_by": null,
+      "created_at": "2026-05-07T15:21:25.066Z",
+      "updated_at": "2026-05-07T15:21:25.066Z"
+    }
+  },
+  "by_status": {
+    "proposed": [
+      "CON-001",
+      "CON-002",
+      "CON-003",
+      "RGOAL-001",
+      "RGOAL-002",
+      "RGOAL-003",
+      "ASEM-001",
+      "CON-004"
+    ],
+    "challenged": [
+      "CHA-001"
+    ],
+    "frozen": [],
+    "superseded": [],
+    "open": [
+      "RISK-001"
+    ],
+    "discarded": [
+      "DROP-001",
+      "DROP-002"
+    ]
+  },
+  "by_category": {
+    "retained_goal": [
+      "RGOAL-001",
+      "RGOAL-002",
+      "RGOAL-003"
+    ],
+    "confirmed_fact": [
+      "CON-001",
+      "CON-002",
+      "CON-003"
+    ],
+    "frozen_constraint": [
+      "CON-004"
+    ],
+    "challenged_claim": [
+      "CHA-001"
+    ],
+    "discarded_option": [
+      "DROP-001",
+      "DROP-002"
+    ],
+    "high_impact_risk": [
+      "RISK-001"
+    ],
+    "dependency_chain": [],
+    "acceptance_semantic": [
+      "ASEM-001"
+    ]
+  }
+}

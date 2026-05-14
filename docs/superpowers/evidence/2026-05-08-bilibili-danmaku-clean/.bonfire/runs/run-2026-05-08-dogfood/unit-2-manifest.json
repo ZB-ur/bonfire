@@ -1,0 +1,75 @@
+{
+  "unit": "unit-2",
+  "iteration": 1,
+  "files_created": [
+    "src/shared/types.ts",
+    "src/shared/settings.ts",
+    "src/shared/messaging.ts",
+    "tests/shared/types.spec.ts",
+    "tests/shared/settings.spec.ts",
+    "tests/shared/messaging.spec.ts"
+  ],
+  "files_modified": [],
+  "commands_run": [
+    "pnpm typecheck",
+    "pnpm lint",
+    "pnpm test",
+    "pnpm test -- tests/shared",
+    "pnpm build"
+  ],
+  "verification_results": {
+    "pnpm_typecheck": "passed (tsc --noEmit clean under TS strict + exactOptionalPropertyTypes + noUncheckedIndexedAccess)",
+    "pnpm_lint": "passed (eslint clean)",
+    "pnpm_test": "passed (15/15: types 6, settings 7, messaging 2)",
+    "pnpm_test_scoped": "pnpm test -- tests/shared passed (15/15)",
+    "pnpm_build": "passed (vite build, 73ms, dist regenerated)"
+  },
+  "done_when_results": {
+    "all_entity_types_from_domain_model_exported": "pass — types.ts exports NormalizedDanmakuRecord, NoiseVerdict, ExtensionSettings, DenoisedSessionLog, FloodWindowEntry, SelectorRegistryEntry, ProbationSnapshot, plus the supporting unions (DanmakuRole, SourceLayer, NoiseCategory, ActionMode, CommunityPreset, PlaybackMode) and AlwaysAllowEntry. tests/shared/types.spec.ts pins all 13 surface symbols at compile time.",
+    "loadSettings_returns_defaults_on_first_run": "pass — settings.spec.ts 'loadSettings returns defaults on first run and persists them' verifies first-run path: empty store -> defaults built (actionMode=collapse FPD-2, enabled=true, toxicDetectorEnabled=true, enableWsHook=false, probationSnapshot.mode=skip) -> persisted under SETTINGS_STORAGE_KEY.",
+    "saveSettings_emits_chrome_storage_onChanged": "pass — settings.spec.ts 'saveSettings merges patch and emits chrome.storage.onChanged' subscribes via onSettingsChanged, calls saveSettings, observes the change event with the merged shape. Cleanup test confirms unsubscribe detaches the listener."
+  },
+  "engineering_decisions": [
+    "Created src/shared/types.ts with `T | null` typing for medalLevel/guardLevel/role/uid per H-Review preserved condition C5. NEVER used `field?: number` optional-property syntax. The C5 invariant is also pinned at compile time by tests/shared/types.spec.ts (the literal record has medalLevel=null/guardLevel=null/role=null and the file fails to type-check if the contract is silently weakened).",
+    "Exported PRIMARY_CATEGORY_LADDER as a frozen readonly array ['toxic','ad','flood','lowinfo','offtopic'] so unit-6's classifier orchestrator has a single source of truth for the CON-016 priority ladder. The constant lives next to NoiseCategory rather than in a classifier-specific file because the ladder is a contract, not a detector implementation detail.",
+    "Added schemaVersion: number to ExtensionSettings (not enumerated explicitly in the .full domain_model fields but called out by data_contract.persistence.schema_versioning). This is a low-impact engineering wiring choice required for the migration scaffold; product semantics are unchanged.",
+    "Implemented migrateSettings as a defensive field-by-field merge with type guards (isActionMode, isCommunityPreset, isStringArray, isProbationSnapshot). On unknown actionMode the test confirms the migration falls back to 'collapse' (FPD-2 default), so a corrupted blob can never silently flip the default to 'hide'.",
+    "saveSettings re-invokes loadSettings to fetch the current persisted shape rather than caching in memory. This guarantees correctness when popup/options/content scripts each save concurrently. C6 (session-allow vs persistent-allow are two stores) is honored by NOT introducing any session-allow state in this module — that lands in unit-8.",
+    "Promisified chrome.storage.local.get/set inside settings.ts (the @types/chrome v0.0.268 surface is callback-only). Errors are reified via chrome.runtime.lastError -> rejected Promise. This is a wiring choice; no semantic deviation.",
+    "src/shared/messaging.ts defines a MessageMap with three message types observed in the data_contract: GET_TODAY_STATS (popup badge, RU-09 partial), SETTINGS_CHANGED (RU-08 hot-reload fan-out), CONTENT_HELLO (content -> background boot). The set is intentionally minimal — unit-11 will extend it as popup/options handlers land. Adding new types requires extending MessageMap, the sender, and the receiver dispatcher, by design.",
+    "installMessageRouter normalizes sync vs async handler returns by inspecting `result instanceof Promise`. Returns true from the chrome.runtime.onMessage listener iff the handler is async, matching the MV3 messaging contract. This is the single authoritative dispatcher; per-message-type addListener calls are forbidden by convention to avoid double-handling.",
+    "Tests use vitest's fake-chrome installation pattern (mock onto globalThis.chrome). Both settings.spec.ts and messaging.spec.ts set up minimal subsets of chrome.storage / chrome.runtime sufficient for the round-trip assertions. The full surface ships in /achieve browser_checks; this layer only verifies our own contract.",
+    "Module imports use explicit '.js' suffixes (./types.js) inside src/shared so Vite's TS-resolved emit lines up with native ESM resolution. The test files mirror this so vitest's transform pipeline matches the production bundle path."
+  ],
+  "deviations_from_handoff": [
+    {
+      "type": "supporting_test_files_added",
+      "detail": "Unit-2's files list enumerates only the 3 src/shared/*.ts files. I additionally created tests/shared/{types,settings,messaging}.spec.ts so the verification command 'pnpm test -- tests/shared' has something to run and so the done_when assertions are mechanically verified. Tests do not introduce any new product semantics; they pin C5 nullability, the FPD-2 default, the CON-016 ladder, and the loadSettings/saveSettings round-trip from done_when. Marked as a supporting test addition rather than a deviation in scope."
+    },
+    {
+      "type": "schemaVersion_field_added",
+      "detail": "ExtensionSettings carries a schemaVersion: number field. This is not enumerated in the .full domain_model.entities.ExtensionSettings.fields list but is required by data_contract.persistence.schema_versioning ('settings.schemaVersion: number; on mismatch, run migration in src/background/sw.ts'). Adding it here preserves that contract; omitting it would have left the migration scaffold unbacked. CURRENT_SETTINGS_SCHEMA_VERSION is exported alongside loadSettings so unit-11's service worker can import the same constant for migration on install/upgrade."
+    }
+  ],
+  "ambiguities": [
+    {
+      "field": "session-allow store location",
+      "question": "C6 mandates session-allow and persistent-allow as TWO stores. unit-2 implements only the persistent store (alwaysAllowHashes inside ExtensionSettings). The session-allow store is referenced by RU-09 / unit-8. Confirm in unit-8 whether the session-allow store should live as an in-memory Map inside src/content/recover-panel.tsx or as a sibling module under src/shared/. I deliberately did NOT introduce it here to avoid pre-empting unit-8's frozen scope."
+    },
+    {
+      "field": "MessageMap extensibility",
+      "question": "Only three message types are defined (GET_TODAY_STATS, SETTINGS_CHANGED, CONTENT_HELLO). The handoff data_contract.api_contracts mentions these three but does not exhaustively enumerate every message the popup/options/sw will use. unit-11 will extend MessageMap. If unit-11 needs additional types not pre-listed here, that is expected scope, not a contract drift."
+    }
+  ],
+  "constraint_compliance": {
+    "C5_nullable_fields": "honored — NormalizedDanmakuRecord.medalLevel/guardLevel use `number | null`, role uses `DanmakuRole` (union with null), uid uses `string | null`. No `?: T` syntax anywhere in src/shared/types.ts. Compile-time pinned by tests/shared/types.spec.ts.",
+    "C6_two_stores": "honored — ExtensionSettings.alwaysAllowHashes is the persistent store. The session-allow store is intentionally not introduced in unit-2; it is unit-8 territory.",
+    "FPD-13_storage_local_only": "honored — settings.ts touches chrome.storage.local exclusively. No chrome.storage.sync references. listener filters areaName !== 'local'.",
+    "FPD-2_default_actionMode": "honored — buildDefaultSettings returns actionMode='collapse'. migrateSettings falls back to 'collapse' on corrupted blob. Test 'migrateSettings rejects unknown actionMode and falls back' pins this.",
+    "CON-016_multi_label": "honored — NoiseVerdict.category is NoiseCategory[] (a string-literal union array, multi-label). PRIMARY_CATEGORY_LADDER exports the toxic > ad > flood > lowinfo > offtopic order verbatim.",
+    "CON-007_ExtensionSettings": "honored — every field from the .full domain_model.entities.ExtensionSettings is present, plus schemaVersion for migration.",
+    "CON-018_FloodWindowEntry": "honored — FloodWindowEntry shape matches the .full domain_model entry. Hard caps (Map.size 8192, per-tick 500, 60s window) live in unit-6 flood.ts; types.ts only defines the entry shape.",
+    "CON-019_ProbationSnapshot": "honored — ProbationSnapshot includes medalLevelVisibilityRatio: number | null, measuredAt: number | null, mode: 'skip' | 'fans-medal-detector-with-penalty'. Default mode is 'skip' until RU-01.5 measurement; fully matches CON-019/C1.",
+    "FPD-4_no_network": "honored — neither types.ts nor settings.ts nor messaging.ts contains fetch/XHR/WebSocket/sendBeacon. messaging.ts uses chrome.runtime.sendMessage and chrome.tabs.sendMessage only. ESLint no-restricted-globals would block any regression."
+  }
+}

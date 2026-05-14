@@ -1,0 +1,475 @@
+{
+  "bundle_version": 1,
+  "title": "Bilibili Live Danmaku Denoiser Chrome Extension",
+  "created_at": "2026-05-07T15:42:18.093Z",
+  "source_request": "做一个 B 站直播间弹幕降噪 Chrome 插件",
+  "project_paths": {
+    "root": "/Users/lddmay/AiCoding/bonfire-test/bilibili-danmaku-denoiser-clean"
+  },
+  "stages": {
+    "preprocess": {
+      "user_stated_request": "做一个 B 站直播间弹幕降噪 Chrome 插件",
+      "ambiguity_points": [
+        "'噪声' 未定义: 刷屏复读 / 单字符 / 广告引流 / toxicity / 偏题闲聊 / 剧透 哪几类全部包含?(决议: 五类全部 in-scope, 不含剧透)",
+        "降噪动作未定义: 隐藏 / 折叠计数 / 半透明淡化 / 标记不删 (决议: 三种行为模式都实现, 默认折叠)",
+        "范围未定义: 仅直播间? 含回放? 含 VOD? 含网页全屏/影院/小窗? (决议: 直播间+回放+四种播放形态, 不含 VOD)",
+        "MV3 浏览器范围: Chrome only? Edge/Firefox/国内套壳? (决议: Chrome 主目标 + Edge 自动 + Firefox webextension-polyfill + 套壳 best-effort)",
+        "联网允许度: 100% 本地 vs 云端 LLM (决议: MVP 100% 本地, 用户自带 key 云模式作为 v2 OPTIONAL)",
+        "误杀 vs 漏判优先级 (决议: 不强行二选一, 通过 '可恢复 + 用户反馈调阈值' 中和, 验收使用 qualitative 体感判定)",
+        "插件分发: 商店上架 vs sideload (决议: sideload + GitHub 开源, 不上架)",
+        "登录态依赖: 是否需要 cookie/账号 (决议: 不需要登录, 仅从公开 DOM 解析角色信息)",
+        "与 B 站自带屏蔽词关系 (决议: 叠加, 不替代; 不互调用)",
+        "与其他 B 站扩展 (哔哩哔哩助手/弹幕姬) 共存 (决议: in-scope, 共存不破坏)"
+      ],
+      "dubious_claims": [
+        "用户字面 'Chrome 插件' 隐含范围实际应包含 Chromium 系 + Firefox (CLAIM-001)",
+        "用户隐含 '降噪 == 关键词屏蔽' 但 intent-extractor 推断真实期望是 '比 B 站自带更聪明的语义/复读检测', 这一升级用户未明说"
+      ],
+      "factual_gaps": [
+        "本机 Node.js / pnpm / 构建工具链版本未知 (DEP-001)",
+        "Bilibili 直播页 DOM 选择器与 WebSocket protobuf schema 当前版本未实测",
+        "用户使用的浏览器版本 + 是否启用了硬件加速 + 屏幕阅读器具体型号 未知"
+      ],
+      "hidden_assumptions": [
+        "假设 B 站直播弹幕可以被前端拦截 (实际部分走 canvas + WebSocket, DOM 拦截可能不够)",
+        "假设 '什么是噪声' 对所有房间统一 (实际游戏区/VTuber 区/学习区文化差异巨大)",
+        "假设单机使用无跨设备同步需求",
+        "假设性能开销可忽略 (实际峰值 200+ 条/秒会暴露开销)",
+        "假设可豁免主播/房管/大航海/SC 等角色, 但 DOM 解析路径未验证",
+        "假设不需登录态即可读取上述角色标签"
+      ],
+      "suspected_real_goals": [
+        "在观看 B 站直播时通过 Chrome 扩展自动降噪弹幕, 提升信噪比",
+        "无侵入改造 B 站直播页, 而非另起独立工具",
+        "比 B 站自带关键词屏蔽更聪明 (复读/语义/角色感知)",
+        "保留弹幕互动氛围, 仅去除噪声而非让弹幕消失",
+        "本地处理零成本日常使用, 不依赖云端服务"
+      ],
+      "scenario_fragments": [
+        "热门主播直播间打开后, 刷屏 '23333/666/复读' 自动折叠为 'X ×N' 计数行",
+        "广告引流/外链/卖号弹幕直接不出现",
+        "主播本人/房管/醒目留言/大航海弹幕始终原样显示 (白名单豁免)",
+        "切换到另一个直播间 (SPA 跳转) 后降噪上下文重置, 不污染新房间",
+        "进入网页全屏/影院模式/小窗悬浮后降噪规则继续生效",
+        "用户点击角标查看 '今日已降噪 X 条' + 误杀回放 + 一键放回",
+        "VTuber 房间下 '草' 类亚文化弹幕不被一刀切误伤",
+        "同时安装 哔哩哔哩助手 + 弹幕姬 时三插件并存不冲突"
+      ],
+      "success_signals": [
+        "qualitative 体感: 在用户自选热门直播间 (>50 条/秒) 开启 30 分钟主观判断 '清爽 + 没漏抽奖口令 + 没误杀主播'",
+        "8h 长 session 浏览器 tab 内存不持续单调增长 (1h/4h/8h baseline 涨幅 < 20%)",
+        "三插件并存场景下控制台无 error spam / 无双重隐藏闪烁"
+      ],
+      "non_goals": [
+        "不做 VOD /video/ 普通视频弹幕降噪 (DROP-001)",
+        "不做 Chrome Web Store 上架 (DROP-002)",
+        "不做云端 LLM MVP (DROP-003, 留作 v2 OPTIONAL)",
+        "不做 '替代' B 站自带屏蔽词 (仅叠加共存)",
+        "不做客户端举报/删除 B 站后端数据的调用",
+        "不做跨设备 chrome.storage.sync 状态同步 MVP (避免上传弹幕样本到 Google)",
+        "不做 i18n 多语言界面 MVP (中文界面够用, 弹幕识别仍兼容繁/日/英文本)",
+        "不做移动端覆盖 (Chrome 插件天然不支持)",
+        "不做付费弹幕/SC 降噪 (硬白名单豁免)"
+      ],
+      "follow_up_questions": [
+        "(全部由 operator persona 自答) 见上方 ambiguity_points 决议"
+      ],
+      "blocking_unknowns": [],
+      "reframed_goal": "MV3 Chrome 扩展, B 站直播弹幕 5 类客户端降噪, 默认折叠合并, 角色硬白名单, 100% 本地, 兼容 SPA / 4 种播放形态 / 多扩展共存 / a11y / 回放, 不上架商店, sideload + 开源 GitHub.",
+      "retained_scope": [
+        "5 类噪声识别: 刷屏复读 / 纯表情单字 / 广告引流外链 / toxicity辱骂 / 偏题闲聊 (CON-001)",
+        "三种降噪动作: 折叠计数(默认) / 完全隐藏 / 半透明淡化 (CON-002)",
+        "页面范围: 直播间 + 回放 + 网页全屏 + 影院 + 小窗 (CON-003)",
+        "SPA 切换降噪上下文重置 (CON-004)",
+        "归一化: NFKC / 零宽剥离 / 简繁折叠 / 拼音 / emoji 别名 (CON-005)",
+        "硬白名单豁免: 主播 / 房管 / SC / 大航海 / 礼物上舰 (CON-006)",
+        "用户自定义: 关键词 + UID 黑名单 + 房间白名单 + 关键词白名单 + 默认开箱即用 (CON-007)",
+        "a11y: aria-hidden + 高对比度自动降级 + 键盘可达 (CON-008)",
+        "多扩展共存: 哔哩哔哩助手 / 弹幕姬 (CON-009)",
+        "Censorship-adjacency: 仅 client-side hide, 不调 B 站 API, 不污染他人视角 (CON-010)",
+        "误判可恢复 + '今日降噪 X 条' 角标 + 反馈循环 (CON-011)",
+        "MV3 + Chrome 主 + Edge 自动 + Firefox polyfill + 国内套壳 best-effort (CON-012)"
+      ],
+      "excluded_scope": [
+        "VOD /video/ 普通视频弹幕 (DROP-001)",
+        "Chrome Web Store 上架 (DROP-002)",
+        "云端 LLM MVP (DROP-003)",
+        "i18n 多语言 UI",
+        "移动端 / Bilibili App",
+        "跨设备 chrome.storage.sync",
+        "替代 B 站自带屏蔽词",
+        "向 B 站后端发任何举报/删除请求",
+        "付费弹幕/SC 降噪 (硬豁免)"
+      ],
+      "critical_assumptions": [
+        "B 站直播弹幕节点的角色信息 (主播/房管/SC/大航海) 可从 DOM class 或 data-* 属性解析, 无需登录态",
+        "DOM 拦截 + mutation observer 即可满足 MVP 降噪需求, WebSocket protobuf 劫持留作 v2",
+        "局部启发式 + 规则引擎 + 滑动窗口 LRU 即可在 8h session 下保持内存稳定",
+        "用户接受 '默认折叠 + 可逐条恢复' 的非破坏性降噪而非硬删除",
+        "'噪声' 标准随用户社区文化 (VTuber/游戏区) 默认提供两套预设规则集"
+      ],
+      "frozen_for_code": [
+        "5 类噪声 (CON-001) 不允许只实现子集",
+        "默认动作 = 折叠合并显示计数, 不允许默认 = 隐藏 (CON-002)",
+        "硬白名单豁免清单 (CON-006) 不允许任何降噪规则覆盖",
+        "100% 本地无远程调用 (DROP-003) 不允许偷偷加遥测/云模型",
+        "Censorship-adjacency 边界 (CON-010) 不允许调用 B 站后端",
+        "归一化必须前置于复读检测 (CON-005)",
+        "MV3 而非 MV2"
+      ],
+      "reframed_request": "面向中度 B 站直播观众 (游戏区+VTuber 混看, 自用 sideload + 开源) 构建一个 MV3 Chrome 扩展, 在 live.bilibili.com 直播间 (含回放, 含网页全屏/影院/小窗 4 种播放形态) 下对实时弹幕进行 5 类噪声 (刷屏复读/单字纯表情/广告引流/toxicity/偏题闲聊) 的客户端识别与降噪. 默认动作为折叠合并显示计数, 用户可切隐藏或半透明. 主播/房管/大航海/醒目留言/SC 角色硬白名单豁免. 100% 本地处理无远程调用. SPA 切换正确重置上下文. 与 哔哩哔哩助手 / 弹幕姬 共存. a11y 屏幕阅读器兼容. Censorship-adjacency 仅 client-side hide 不调用 B 站删除/举报 API. 提供 '今日降噪 X 条' 角标 + 误杀回放 + 反馈循环. 验收使用 qualitative 体感判定 + 8h 内存观察 + 多扩展共存观察, 不要求量化 precision/recall.",
+      "approval_pack": {
+        "reframed_goal": "MV3 Chrome 扩展, B 站直播弹幕 5 类客户端降噪, 默认折叠合并, 角色硬白名单, 100% 本地, 兼容 SPA / 4 种播放形态 / 多扩展共存 / a11y / 回放, 不上架商店, sideload + 开源 GitHub.",
+        "retained_scope": [
+          "5 类噪声识别: 刷屏复读 / 纯表情单字 / 广告引流外链 / toxicity辱骂 / 偏题闲聊 (CON-001)",
+          "三种降噪动作: 折叠计数(默认) / 完全隐藏 / 半透明淡化 (CON-002)",
+          "页面范围: 直播间 + 回放 + 网页全屏 + 影院 + 小窗 (CON-003)",
+          "SPA 切换降噪上下文重置 (CON-004)",
+          "归一化: NFKC / 零宽剥离 / 简繁折叠 / 拼音 / emoji 别名 (CON-005)",
+          "硬白名单豁免: 主播 / 房管 / SC / 大航海 / 礼物上舰 (CON-006)",
+          "用户自定义: 关键词 + UID 黑名单 + 房间白名单 + 关键词白名单 + 默认开箱即用 (CON-007)",
+          "a11y: aria-hidden + 高对比度自动降级 + 键盘可达 (CON-008)",
+          "多扩展共存: 哔哩哔哩助手 / 弹幕姬 (CON-009)",
+          "Censorship-adjacency: 仅 client-side hide, 不调 B 站 API, 不污染他人视角 (CON-010)",
+          "误判可恢复 + '今日降噪 X 条' 角标 + 反馈循环 (CON-011)",
+          "MV3 + Chrome 主 + Edge 自动 + Firefox polyfill + 国内套壳 best-effort (CON-012)"
+        ],
+        "excluded_scope": [
+          "VOD /video/ 普通视频弹幕 (DROP-001)",
+          "Chrome Web Store 上架 (DROP-002)",
+          "云端 LLM MVP (DROP-003)",
+          "i18n 多语言 UI",
+          "移动端 / Bilibili App",
+          "跨设备 chrome.storage.sync",
+          "替代 B 站自带屏蔽词",
+          "向 B 站后端发任何举报/删除请求",
+          "付费弹幕/SC 降噪 (硬豁免)"
+        ],
+        "critical_assumptions": [
+          "B 站直播弹幕节点的角色信息 (主播/房管/SC/大航海) 可从 DOM class 或 data-* 属性解析, 无需登录态",
+          "DOM 拦截 + mutation observer 即可满足 MVP 降噪需求, WebSocket protobuf 劫持留作 v2",
+          "局部启发式 + 规则引擎 + 滑动窗口 LRU 即可在 8h session 下保持内存稳定",
+          "用户接受 '默认折叠 + 可逐条恢复' 的非破坏性降噪而非硬删除",
+          "'噪声' 标准随用户社区文化 (VTuber/游戏区) 默认提供两套预设规则集"
+        ],
+        "frozen_for_code": [
+          "5 类噪声 (CON-001) 不允许只实现子集",
+          "默认动作 = 折叠合并显示计数, 不允许默认 = 隐藏 (CON-002)",
+          "硬白名单豁免清单 (CON-006) 不允许任何降噪规则覆盖",
+          "100% 本地无远程调用 (DROP-003) 不允许偷偷加遥测/云模型",
+          "Censorship-adjacency 边界 (CON-010) 不允许调用 B 站后端",
+          "归一化必须前置于复读检测 (CON-005)",
+          "MV3 而非 MV2"
+        ]
+      }
+    },
+    "divergence": {
+      "options": [
+        {
+          "id": "OPT-A",
+          "name": "DOM-only Mutation Observer",
+          "summary": "在 content script 内挂 MutationObserver 监听弹幕容器, 弹幕 DOM 节点出现时即时识别 + 操作 (折叠/隐藏/淡化). 不触碰 WebSocket. MV3 service worker 只承担规则下发与统计聚合.",
+          "tradeoffs": "+实施快, 与 B 站协议解耦, 反作弊面最低. -弹幕会先渲染再被处理, 高密度时短暂闪现 1 帧; 角色识别依赖 DOM class 稳定性.",
+          "blind_spots_covered": ["a11y (CON-008): 仅修改 DOM 属性 aria-hidden, 易实现", "多扩展共存 (CON-009): 同层挂 observer, 协调 namespace 即可", "Censorship-adjacency (CON-010): 不接触底层网络, 自然合规", "SPA 切换 (CON-004): 监听 history pushState 后重挂 observer", "4 种播放形态 (CON-003): 选择器适配多容器即可"],
+          "blind_spots_uncovered": ["RISK-003 闪烁问题保留", "归一化 (CON-005) 与角色解析全靠 DOM 文本/class, 风控指纹更可见"]
+        },
+        {
+          "id": "OPT-B",
+          "name": "WebSocket Protobuf Hijack",
+          "summary": "通过 page-injected script 劫持 WebSocket 构造器, 解析 brotli + protobuf 弹幕帧, 在帧到达 DOM 之前判定并丢弃/标记. content script 只做 UI 层 (角标/统计/设置面板).",
+          "tradeoffs": "+源头降噪, 零闪烁, 复读统计/角色解析直接吃 protobuf 字段, 准确度最高. -B 站 protobuf schema 频繁变, 维护成本高; page world 注入触发风控指纹概率高 (RISK-001); MV3 host_permissions + page-world 注入合规边界紧.",
+          "blind_spots_covered": ["RISK-003 完美解决", "CON-005 归一化前移到字符串源", "CON-006 角色解析直接吃帧字段", "8h 内存 (RISK-002): 帧级 sampling 容易做"],
+          "blind_spots_uncovered": ["CON-010 Censorship-adjacency 边界更敏感: 改写 WS 接收流可能被解读为'平台层规避'", "CON-009 多扩展共存: 多个插件抢 WebSocket prototype 必然冲突", "CON-008 a11y: 帧级处理离 UI 层远, aria 联动需额外路由"]
+        },
+        {
+          "id": "OPT-C",
+          "name": "Hybrid Layered: DOM-default + Optional WS Hook (RETAINED)",
+          "summary": "MVP 默认采用 OPT-A 的 DOM 拦截方案, 同时预留显式启用的 WS hook 作为 v2 进阶层 (用户在设置面板手动开关). 两层共享同一 NoiseClassifier + WhitelistEngine, 仅前置归一化与节点定位路径不同. 默认状态下行为等价于 OPT-A; 高级用户可启用 WS 层换零闪烁.",
+          "tradeoffs": "+MVP 风险与 OPT-A 同低, 同时为高级体验留进化路径. +两层共享算法降低重复代码. -总体复杂度最高, 接口边界 (Classifier 输入抽象 = NormalizedDanmakuRecord) 必须从第一天就锁死, 否则 v2 会推翻 v1.",
+          "blind_spots_covered": ["与 OPT-A 相同的全部 a11y / 共存 / 合规优势", "为 RISK-003 留出后路, 不锁死 MVP 决策", "归一化 (CON-005) 通过统一 NormalizedDanmakuRecord 接口在两层都生效", "SPA 切换 (CON-004) 由共享 ContextLifecycle 管控, 两层都受益"],
+          "blind_spots_uncovered": ["接口抽象设计错误的代价最大 — 需要在 Stage C 严格冻结 NormalizedDanmakuRecord 与 Classifier 契约, 否则 v2 会割裂", "新手开发者 (用户人格 JS 浅) 维护两层的认知负担"]
+        }
+      ],
+      "retained_option_id": "OPT-C",
+      "retained_option": {
+        "id": "OPT-C",
+        "name": "Hybrid Layered: DOM-default + Optional WS Hook",
+        "summary": "MVP 默认 DOM 拦截; 同接口预留 WS hook 作为 v2 进阶层. 共享 NoiseClassifier + WhitelistEngine + NormalizedDanmakuRecord."
+      },
+      "retention_rationale": "用户人格关心 8h 跨夜直播 + VTuber 高速弹幕 (RISK-002+RISK-003 都重要), MVP 必须先跑起来 (OPT-A 优势), 但又不能堵死零闪烁演进 (OPT-B 优势). OPT-C 通过共享 NoiseClassifier+WhitelistEngine+NormalizedDanmakuRecord 接口让两层并存, MVP 体感等价 OPT-A, 同时为 v2 留位. 代价是接口设计需在 Stage C 提前冻结, 这恰好倒逼下游契约清晰 — 与 bonfire 哲学契合.",
+      "rejected_rationale": {
+        "OPT-A": "无法响应用户对 8h 高密度 VTuber 房间体感的隐含期待 (闪烁会被察觉), 也封死 v2 演进.",
+        "OPT-B": "MVP 风险过高: 协议反爬 + 多扩展抢 WS + 用户 JS 浅维护成本. 与用户人格 (不长期维护) 冲突. 留作可选层而非默认层."
+      }
+    },
+    "requirements": {
+      "summary": "OPT-C Hybrid Layered MV3 扩展. 12 requirement units 覆盖 12 个 retained_goal (CON-001..012) + 3 个 risk (RISK-001..003) + 1 dependency (DEP-001).",
+      "requirement_units": [
+        {
+          "id": "RU-01",
+          "title": "MV3 Manifest + 项目骨架",
+          "covers": ["CON-012", "DEP-001"],
+          "description": "建立 MV3 manifest.json (host_permissions: live.bilibili.com, www.bilibili.com 视频回放页), background service worker, content script 注入规则. Vite + TypeScript + @crxjs/vite-plugin 构建. 输出 unpacked dist/ 可侧载, 同时输出 zip 供 GitHub release.",
+          "success_criteria": "dist/manifest.json valid; chrome://extensions Load Unpacked 成功; service worker 启动后空操作 < 50ms."
+        },
+        {
+          "id": "RU-02",
+          "title": "NormalizedDanmakuRecord 接口与归一化管线",
+          "covers": ["CON-005"],
+          "description": "定义 NormalizedDanmakuRecord = { rawText, normalizedText, uid?, role?, medalLevel?, guardLevel?, isPaid, ts, sourceLayer: 'dom' | 'ws' }. 归一化步骤: NFKC -> 零宽字符剥离 -> 简繁折叠 (繁->简) -> 拼音 fallback (jieba-pinyin lite or chinese-utils) -> emoji 别名表 (草=艹=cao=🌱, 6=666=陆=六).",
+          "success_criteria": "单元测试: '草', '艹', 'cao', '🌱', '\\u200b艹\\u200b' 全部归一化为同一 normalizedText 'cao'."
+        },
+        {
+          "id": "RU-03",
+          "title": "DOM 拦截层 (默认 MVP 路径)",
+          "covers": ["CON-003", "CON-004", "OPT-C 默认层"],
+          "description": "Content script 在 live.bilibili.com 直播间挂 MutationObserver, 监听弹幕容器 (主弹幕/网页全屏弹幕/影院模式弹幕/小窗弹幕 4 种 selector). 节点新增时构造 NormalizedDanmakuRecord 送入 NoiseClassifier. SPA history.pushState 监听重新挂载.",
+          "success_criteria": "在 live.bilibili.com/<room>/ 打开后, console 可观察到弹幕节点产生 NormalizedDanmakuRecord 流; 切到另一房间后旧 observer 已 disconnect 且新房间正确接管."
+        },
+        {
+          "id": "RU-04",
+          "title": "WhitelistEngine (硬豁免)",
+          "covers": ["CON-006", "frozen_for_code 第3条"],
+          "description": "解析 NormalizedDanmakuRecord 的 role / medalLevel / guardLevel / isPaid 字段, 凡命中 (role=主播|房管 OR isPaid=true OR guardLevel>=1 OR roleClass 含 '总督/提督/舰长/醒目留言/上舰') 直接 verdict=PASS, 跳过所有降噪规则. 优先级最高, 不可被任何规则覆盖.",
+          "success_criteria": "测试用例: 构造 5 类豁免角色 fixture, 即便文本完全等同已知噪声, classifier verdict 仍为 PASS."
+        },
+        {
+          "id": "RU-05",
+          "title": "NoiseClassifier 五分类规则引擎",
+          "covers": ["CON-001"],
+          "description": "Classifier 输入 NormalizedDanmakuRecord, 输出 { verdict: PASS|NOISE, category: 'flood'|'lowinfo'|'ad'|'toxic'|'offtopic'|null, confidence: 0..1 }. 5 个 detector 各自独立: FloodDetector (滑动窗口 LRU 60s 内 normalizedText hash 出现 >= 3 次), LowInfoDetector (normalizedText 长度<=2 或全为表情/单字字符集 ['6','草','?','哈','233','...']), AdDetector (URL/QQ群号/微信号/'+VX'正则), ToxicDetector (本地侮辱词典 + 上下文增强), OffTopicDetector (与房间分类预设关键词集距离过大, 体感保守阈值).",
+          "success_criteria": "5 个 detector 各自有独立单元测试 fixture; 整体调用顺序 = whitelist (RU-04) -> 归一化 (RU-02) -> 5 个 detector 并联 -> 任一命中即 verdict=NOISE."
+        },
+        {
+          "id": "RU-06",
+          "title": "降噪动作执行器 (3 种动作模式)",
+          "covers": ["CON-002", "CON-008"],
+          "description": "Action Executor 读取用户设置 mode='collapse'(default)|'hide'|'fade', 对 NOISE 节点: collapse=合并到 '<category> ×N' 行, hide=aria-hidden+visibility:hidden (注: 不用 display:none, a11y), fade=opacity:0.3. 高对比度 (prefers-contrast: more) 自动从 fade 降级 hide. 操作 DOM 时所有写入加 namespace class 'bdd-*' 避免与其他扩展冲突.",
+          "success_criteria": "三种模式各自手动 demo 通过; 高对比度系统设置下 fade 自动降级; 操作过的节点都带 'bdd-*' 类."
+        },
+        {
+          "id": "RU-07",
+          "title": "WebSocket Hook 进阶层 (OPT-C v2 预留, 默认 disabled)",
+          "covers": ["RISK-003"],
+          "description": "在 page-injected world 重写 window.WebSocket 构造器, 解析 Bilibili 弹幕 WS 帧 (二进制+brotli+protobuf), 转换为 NormalizedDanmakuRecord (sourceLayer='ws'). 同样喂给 RU-04+RU-05+RU-06. MVP 默认设置 enableWsHook=false, 仅高级用户在选项页手动勾选启用. 帧 schema 解析失败时降级为 DOM 层 fallback (不抛错给页面).",
+          "success_criteria": "默认安装下不注入 page world; 用户启用后 console 可见 'WS frames intercepted: N'; protobuf schema 改变时 fallback 路径不报错."
+        },
+        {
+          "id": "RU-08",
+          "title": "用户设置面板 (popup + options page)",
+          "covers": ["CON-007"],
+          "description": "Popup: 一键开关降噪 + 模式切换 (collapse/hide/fade) + 当前房间统计 '今日已降噪 X 条'. Options page: 关键词黑名单 / UID 黑名单 / 房间白名单 / 关键词白名单 / 高级 (启用 WS hook). 数据存 chrome.storage.local. 不使用 chrome.storage.sync (frozen_for_code).",
+          "success_criteria": "popup 加载 < 200ms; options 修改后 content script 在 1s 内热生效 (通过 chrome.storage.onChanged)."
+        },
+        {
+          "id": "RU-09",
+          "title": "误判可恢复 + 反馈循环",
+          "covers": ["CON-011"],
+          "description": "降噪角标点击展开浮层, 列出本会话被降噪的弹幕 (rawText/UID/ts/category/confidence). 每条带 '放回' 按钮: 点击后该 normalizedText hash 加入会话级白名单, 之后 60s 内同 hash 不再被 NoiseClassifier 拦截. 'Always allow' 按钮则永久写入 chrome.storage.local 用户白名单 (RU-08).",
+          "success_criteria": "demo: 故意把'抽奖口令'当作 lowinfo 拦截 -> 浮层可见 -> 点击'放回' -> 之后同房间下相同口令不再被拦截."
+        },
+        {
+          "id": "RU-10",
+          "title": "多扩展共存策略",
+          "covers": ["CON-009"],
+          "description": "MutationObserver 仅在 RU-06 写入的 'bdd-*' 类节点上回环过滤; 不删除其他插件添加的子节点 (用 attribute hide 而非 removeChild); WebSocket 劫持仅在用户启用时, 且使用 WeakMap 记录已 patched 的实例避免重复 patch (与 哔哩哔哩助手 共存场景).",
+          "success_criteria": "并存场景手动验收 (ACC-003): 装本插件 + 哔哩哔哩助手 + 弹幕姬, 在 console 无 error; 弹幕区无双重隐藏闪烁."
+        },
+        {
+          "id": "RU-11",
+          "title": "8h Session 内存稳定性",
+          "covers": ["RISK-002"],
+          "description": "FloodDetector 滑动窗口实现: Map<hash, {count, firstSeenTs, lastSeenTs}>, 周期性 (每 30s) 清除 lastSeenTs 早于 60s 前的 entries. 浮层日志最大保留 1000 条 (LRU). NormalizedDanmakuRecord 不长期保留, 仅 detector 用完即弃.",
+          "success_criteria": "ACC-002: 1h/4h/8h 三个时点 chrome://task-manager 内存涨幅 < 20%."
+        },
+        {
+          "id": "RU-12",
+          "title": "Censorship-adjacency 边界 + 反作弊规避",
+          "covers": ["CON-010", "RISK-001"],
+          "description": "硬编码: 严禁向 *.bilibili.com 发送任何 fetch/XHR/WebSocket 请求 (ESLint 规则 no-network-call); 严禁修改 B 站发往后端的请求体 (无 webRequestBlocking 权限申请); 仅 host_permissions 限定到 *.bilibili.com 用于读 page DOM. MutationObserver 节流 (requestIdleCallback + microtask batch).",
+          "success_criteria": "manifest 不含 webRequestBlocking 权限; ESLint 规则触发拦截; 在登录账户下连续运行 1h 不出现弹幕发送被静默吞."
+        }
+      ],
+      "units": [],
+      "interfaces": [
+        "NormalizedDanmakuRecord (RU-02 输出, RU-03/RU-07 提供, RU-04/RU-05 消费)",
+        "NoiseVerdict (RU-05 输出, RU-06 消费)",
+        "ExtensionSettings (RU-08 写, RU-03/RU-05/RU-06/RU-07 读)",
+        "DenoisedSessionLog (RU-06 写, RU-09 读)"
+      ],
+      "validation_targets": [
+        "归一化幂等: normalize(normalize(x)) == normalize(x)",
+        "Whitelist 优先级: 任何 NoiseDetector 命中必须被 WhitelistEngine 在前置 verdict=PASS 时覆盖",
+        "SPA 切换: 旧 observer disconnect + 新 observer 接管, 无重复触发",
+        "8h 内存: 滑动窗口确实清理, Map.size 不单调上升"
+      ],
+      "non_goals_recap": [
+        "不实现 cloud LLM (DROP-003)",
+        "不实现 chrome.storage.sync 跨设备同步",
+        "不实现 store-grade i18n / 隐私政策",
+        "不实现 VOD 普通视频弹幕 (DROP-001)"
+      ]
+    },
+    "critique": {
+      "agent": "bonfire-d-critique",
+      "delta_file": ".bonfire/plan/bonfire-d-critique-delta.json",
+      "challenges_count": 9,
+      "proposals_count": 4,
+      "alignments_count": 2,
+      "challenges_applied_to_ledger": ["ACC-001", "CON-001", "CON-014", "CON-015", "CON-013", "CON-004", "CON-009"],
+      "challenges_dropped_unknown_target": ["RU-11", "RU-05"],
+      "proposals_added_to_ledger": ["RISK-004", "RISK-005", "CON-016", "ACC-006"],
+      "summary": "d-critique 攻击 9 个目标 (主要打 ACC-001 不可证伪、CON-001/014/015 detector 多标签矛盾、CON-013 字段假设、SPA bfcache 漏洞、ToxicDetector 来源缺失). 提出 4 个新条目修补 (2 risks + 1 多标签 verdict + 1 binary checklist 验收). 2 个对 RU-* 的挑战因 ID 无法路由到 ledger 被记录到 delta 文件但未触达 ledger."
+    },
+    "closure": {
+      "summary": "12 RU 的依赖闭包 + d-critique 修补集成. 添加 RU-13 (Toxic 词典策略) 与 RU-14 (Whitelist 字段降级策略) 闭合 RISK-004/RISK-005. 调整 RU-04/05/15 顺序以解决 CON-015 challenge.",
+      "added_units_post_critique": [
+        {
+          "id": "RU-13",
+          "title": "ToxicDetector 词典策略 (闭合 RISK-004)",
+          "covers": ["RISK-004", "CON-001 (e)"],
+          "description": "MVP 词典: 引用 textfilter 或 sensitive-word 开源 zh-Hans 列表 (MIT/BSD), 打包入扩展 (单文件 < 200KB). 不做 zh-Hant/Japanese 全量, 仅做基础互通 (繁简折叠 已在 RU-02 处理). 词典更新机制: 每次扩展版本发布更新, 不做远程拉取 (符合 DROP-003+MV3). 用户白名单 (RU-08) 可覆盖词典误杀.",
+          "success_criteria": "扩展包 < 500KB; 测试 fixture: 10 条侮辱性 + 10 条非侮辱性, 检测率 ≥ 80% / 误杀率 ≤ 20% (体感粗略, 不强制)."
+        },
+        {
+          "id": "RU-14",
+          "title": "Whitelist 字段缺失降级策略 (闭合 RISK-005)",
+          "covers": ["RISK-005", "CON-006"],
+          "description": "WhitelistEngine 在字段缺失时采取保守策略 (而非默认 not-whitelisted): (a) role 缺失但弹幕节点 class 含 'fans-medal' 等任一可识别标记 -> 视为可能 SC/大航海, 进入 PROBATION 状态, 不降噪但不进入硬白名单; (b) 完全无角色信息 -> 走 detector 流程; (c) Probe 阶段需验证 medalLevel/guardLevel 在登录态/未登录态下的可见性, 结果反哺 default 行为.",
+          "success_criteria": "Probe (Stage F) 报告 medalLevel/guardLevel 在 5 个真实房间样本下的可见率; PROBATION 路径单元测试覆盖."
+        },
+        {
+          "id": "RU-15",
+          "title": "结构化归一化分两阶段 (闭合 CON-015 challenge)",
+          "covers": ["CON-015", "CON-013"],
+          "description": "归一化拆分: Phase 1 (record-construction) — DOM/WS 层提取 role/medalLevel/guardLevel/uid/rawText 构造 NormalizedDanmakuRecord (text 字段未归一化, 仅 raw); Phase 2 (text-normalization) — 对 rawText 跑 NFKC + 零宽 + 简繁 + 拼音 + emoji 别名得到 normalizedText. WhitelistEngine 在 Phase 1 输出后 / Phase 2 之前调用 (因为它只关心结构字段, 不关心文本归一化). detector 在 Phase 2 之后调用. 调用顺序: P1 -> WhitelistEngine -> P2 -> 5 detector 并联."
+        }
+      ],
+      "execution_chain": [
+        "RU-01 (manifest 骨架) -> RU-02 (Phase 2 归一化纯函数) -> RU-15 (双阶段管线编排)",
+        "RU-15 输入路径 A: RU-03 (DOM 层 P1)",
+        "RU-15 输入路径 B (默认 disabled): RU-07 (WS 层 P1)",
+        "RU-15 -> RU-04 (Whitelist) -> RU-14 (字段降级) -> RU-05 (5 detector) -> RU-06 (Action Executor)",
+        "RU-06 写 DenoisedSessionLog -> RU-09 (反馈循环) -> 用户 'Always allow' -> RU-08 (设置存储) 写入 chrome.storage.local",
+        "RU-08 读 -> RU-03/05/06/07 行为开关",
+        "横向: RU-10 (共存) 包裹 RU-03/RU-06 写入路径, RU-11 (内存) 包裹 RU-05 滑动窗口, RU-12 (合规) ESLint 规则覆盖整库, RU-13 (词典) 是 RU-05.toxic 的资产文件"
+      ],
+      "dependency_chain_validity": {
+        "DEP-001": "构建工具决策: Vite + @crxjs/vite-plugin + TypeScript + pnpm. 锁死.",
+        "DEP-002": "RU 内部依赖关系上方 execution_chain 已绘. 无环."
+      },
+      "dependency_chain": [
+        { "id": "DC-1", "description": "MV3 骨架 -> 文本归一化纯函数 -> 双阶段管线编排", "upstream": ["RU-01"], "downstream": ["RU-02", "RU-15"] },
+        { "id": "DC-2", "description": "管线接入两个数据源 (DOM 默认, WS 可选)", "upstream": ["RU-15"], "downstream": ["RU-03", "RU-07"] },
+        { "id": "DC-3", "description": "Whitelist + 字段降级 + 多标签 detector + 动作执行", "upstream": ["RU-15", "RU-04", "RU-14"], "downstream": ["RU-05", "RU-06"] },
+        { "id": "DC-4", "description": "横切关注: 共存 / 内存 / 合规 / 设置存储 / 反馈", "upstream": ["RU-06"], "downstream": ["RU-08", "RU-09", "RU-10", "RU-11", "RU-12", "RU-13"] }
+      ],
+      "execution_chain_summary": "RU-01 -> RU-02 -> RU-15 -> {RU-03, RU-07} -> RU-04 -> RU-14 -> RU-05 -> RU-06 -> {RU-09, RU-10, RU-11}; RU-08/12/13 横切.",
+      "resolved_gaps": [
+        "DEP-001 -> Vite + @crxjs/vite-plugin + TypeScript + pnpm 选型锁死",
+        "CON-015 challenge -> RU-15 双阶段拆分, P1 -> Whitelist -> P2 -> detector 顺序",
+        "CON-014 challenge -> CON-016 多标签 verdict 替代单 enum, RU-05 输出契约更新",
+        "RISK-004 -> RU-13 词典策略 (开源 zh-Hans 打包, 无远程更新)",
+        "RISK-005 -> RU-14 字段缺失降级 PROBATION 状态; F-1 probe 验证可见率",
+        "ACC-001 challenge -> ACC-006 binary checklist 8 项替代 (合并而非取代)"
+      ],
+      "open_questions_for_probes": [
+        "F-1: medalLevel/guardLevel 在 live.bilibili.com 直播间页面的可见率 (登录 vs 未登录)",
+        "F-2: Bilibili 直播间 4 种播放形态的弹幕容器 selector 列表",
+        "F-3: SPA history.pushState + popstate + pageshow(persisted=true) 在切房间下的实际事件触发顺序",
+        "F-4: 哔哩哔哩助手 / 弹幕姬 当前版本是否仍主流, 是否有 manifest 暴露的 namespace"
+      ]
+    },
+    "probes": {
+      "summary": "4 个 probe 围绕 Stage E open_questions_for_probes. 由于 (1) 项目为空 git repo 无源码, (2) 当前环境无 headless Chromium 可访问 live.bilibili.com, 全部 probe 记录为 'inability-to-probe + assumption-with-mitigation'. 不阻塞 H/J, 但作为已知 unresolved -> 由 RU-14 PROBATION 路径在运行时兜底.",
+      "probes": [
+        {
+          "id": "PR-1",
+          "hypothesis": "B 站直播间 DOM 节点暴露 medalLevel/guardLevel 数据属性, 可在未登录态读取.",
+          "method": "在 chrome devtools console 上 querySelectorAll('.chat-item.danmaku-item') 抽样 50 条节点, 打印每节点 dataset 与 className.",
+          "expected_signal": "5+ 节点显示 data-medal-level 或 .guard-level-N 类.",
+          "kill_criteria": "若 0 节点暴露这两个字段 -> 须切换到 OPT-B WS hijack 才能可靠拿到角色信息.",
+          "result": "INABILITY_TO_PROBE: 当前环境无 headless 浏览器 + 真实 B 站会话.",
+          "mitigation": "RU-14 PROBATION 状态在运行时降级处理; 真正的 Probe 推迟到 /bonfire:code 第一个 dev session 实测."
+        },
+        {
+          "id": "PR-2",
+          "hypothesis": "4 种播放形态 (默认/网页全屏/影院/小窗) 弹幕容器使用同一 selector 树.",
+          "method": "切换 4 种形态各截图 DOM, diff 弹幕容器祖先链.",
+          "expected_signal": "至少 3 种形态共享前缀 selector.",
+          "kill_criteria": "若 4 种形态全部使用不同 root container, RU-03 需要维护 4 套 selector + 各自 mutation observer 实例.",
+          "result": "INABILITY_TO_PROBE: 同 PR-1.",
+          "mitigation": "RU-03 设计上预留 SelectorRegistry: { selector, formMode } -> observer pool, /code 实现时填表."
+        },
+        {
+          "id": "PR-3",
+          "hypothesis": "SPA 切房间触发 history.pushState + popstate, 但 bfcache 返回触发 pageshow(persisted=true).",
+          "method": "Chrome devtools Performance 录制切房间 + 浏览器后退序列, 查看事件触发顺序.",
+          "expected_signal": "首次切换: pushState; 后退: pageshow(persisted=true).",
+          "kill_criteria": "若 pageshow 不触发 -> bfcache restore 路径需独立的 visibilitychange 兜底.",
+          "result": "INABILITY_TO_PROBE: 同 PR-1.",
+          "mitigation": "RU-03 同时挂 pushState/popstate/pageshow/visibilitychange 4 个监听, 共享同一 reset 函数, 幂等设计避免双重 reset."
+        },
+        {
+          "id": "PR-4",
+          "hypothesis": "哔哩哔哩助手 / 弹幕姬 当前发布版本仍主流且稳定.",
+          "method": "Chrome Web Store 搜索 + GitHub star 排序检查最近 commit 时间.",
+          "expected_signal": "两者 last commit < 6 个月内.",
+          "kill_criteria": "若已废弃 -> CON-009 共存目标对象需更新 (但可能更宽松).",
+          "result": "INABILITY_TO_PROBE: 当前环境无网络访问 (不是 bonfire 限制, 是 dogfood 测试环境).",
+          "mitigation": "RU-10 设计为 namespace 隔离 + WeakMap WS instance tracking, 不依赖具体目标插件版本."
+        }
+      ],
+      "unresolved_after_probes": [
+        "RISK-005 字段可见率仍未量化; RU-14 PROBATION 是运行时容错而非静态保证.",
+        "PR-2 4 种播放形态 selector 表实测推迟到 /code 首次 dev session, 故 RU-03 的 SelectorRegistry 需在第一次 code unit 中即落地填值."
+      ]
+    },
+    "red_blue": {
+      "g_red": {
+        "delta_file": ".bonfire/plan/bonfire-g-red-delta.json",
+        "challenges_count": 15,
+        "proposals_count": 6,
+        "proposals_added": ["RISK-006", "RISK-007", "RISK-008", "RISK-009", "RISK-010", "RISK-011"],
+        "summary": "G-Red 攻击 15 个目标: BiDi/combining 绕过 (CON-005), fans-medal 伪造 (CON-006), 敌对扩展抢占 (CON-009), 平台反扩展 (CON-010), 字典污染 (RU-13), PROBATION 永久默认 (RU-14), storage quota (RU-08), burst 内存 (RISK-002), 主观 checklist (ACC-006), 多标签优先级 (CON-016), isPaid 伪造 (CON-013), INABILITY_TO_PROBE handoff 违规 (PR-1), 模型投毒 (RU-09), 供应链 (DEP-001), ESLint 旁路 (RU-12). 添加 6 个新 risk 条目."
+      },
+      "g_blue": {
+        "delta_file": ".bonfire/plan/bonfire-g-blue-delta.json",
+        "alignments_count": 13,
+        "proposals_count": 6,
+        "proposals_added": ["CON-017", "CON-018", "CON-019", "CON-020", "CON-021", "CON-022"],
+        "summary": "G-Blue 同意 13 项攻击成立, 提出 6 个 mitigation: CON-017 (BiDi/组合标记/Variation 归一化), CON-018 (FloodDetector 双轨 hard-cap), CON-019 (PROBATION 闭环 + 反向路径), CON-020 (词典审计 + 用户可关闭), CON-021 (Always allow 安全栏), CON-022 (双信号防伪). 残余风险接受: RISK-010 (平台反扩展) / RU-08 (storage quota) / DEP-001 (供应链) / RU-12 (ESLint 旁路) — 自用 sideload 人格不在 MVP 防御层."
+      },
+      "freeze_gate": {
+        "frozen_in_stage_g": ["CON-009", "CON-013", "CON-016"],
+        "frozen_blocked_by_maturity_gate": ["CON-002", "CON-003", "CON-007", "CON-008", "CON-011", "CON-012", "DEP-001", "ACC-002", "ACC-003", "ACC-004", "ACC-005", "ACC-006", "DEP-002", "CON-017", "CON-018", "CON-019", "CON-020", "CON-021", "CON-022"],
+        "freeze_blocked_for_unchallenged_retained_goals": ["CON-001", "CON-004", "CON-005", "CON-006", "CON-010", "CON-014", "CON-015", "ACC-001"],
+        "risk_entries_remain_OPEN_per_playbook": ["RISK-001", "RISK-002", "RISK-003", "RISK-004", "RISK-005", "RISK-006", "RISK-007", "RISK-008", "RISK-009", "RISK-010", "RISK-011"],
+        "discarded": ["DROP-001", "DROP-002", "DROP-003"],
+        "note": "Maturity gate (challenged_by 非空 才能 freeze) 阻塞了 19 个未被挑战的 PROPOSED 条目. dogfood-log 已记录此为 production-grade blocker. 这些条目以 PROPOSED 状态进入 H/J, 由 H-Review 决定是否仍可作为 code-ready 依据."
+      }
+    },
+    "review": {
+      "agent": "bonfire-h-review",
+      "verdict_file": ".bonfire/plan/h-review-verdict.json",
+      "final_verdict": "approved",
+      "vacuous_pass_note": "原 agent 出 7 条 conditions + 12 条 rulings; 因 apply-h-rulings 拒 RISK freeze + state-advance Layer 2b 拒 condition tokens, 全部丢失. dogfood-log 已记录此为 Layer 2a vacuous-pass loophole.",
+      "preserved_h_review_intent": {
+        "conditions_dropped_due_to_orphan_tokens": [
+          "C1: J-Compile must include implementation_units RU-01.5 first dev session probe — empirical visibility test of medalLevel/guardLevel on >=5 real Bilibili live rooms (logged-in + logged-out). If observed visibility <50%, switch RU-14 default from 'PROBATION skip' to 'fans-medal-only -> detector + 0.2 confidence reduction'.",
+          "C2: J-Compile must restate ACC-006 item (3) with N/A clause for empty rooms; item (8) denominator = normalizedText==cao 单字弹幕 in 30min total occurrences.",
+          "C3: J-Compile must produce file_plan with concrete file paths: manifest.json, src/content/observer.ts, src/content/normalize.ts, src/content/whitelist.ts, src/content/classifier/{flood,lowinfo,ad,toxic,offtopic}.ts, src/content/executor.ts, src/page/ws-hook.ts, src/popup/*, src/options/*, src/background/sw.ts, src/shared/types.ts, dict/audited-zh-profanity.txt, README.md.",
+          "C4: J-Compile must produce verification_commands (pnpm install + pnpm build + manifest validity check + unit tests for ACC-004 normalize idempotency, ACC-005 whitelist priority) and browser_checks 1:1 with ACC-006's 8 binary items.",
+          "C5: J-Compile must declare CON-013 typing for absence vs 0 vs unknown using explicit null | undefined | number not optional `?: number` so RU-04 WhitelistEngine can distinguish field missing (-> RU-14 PROBATION) from field=0 (-> not whitelisted).",
+          "C6: RU-09 session-level allow-list and chrome.storage.local persistent allow-list as two separate stores, session > persistent for current room only; toxic Always-allow requires typed-CONFIRM modal (CON-021 d).",
+          "C7: 'first /code session deliverable' as RU-01.5 empirical baseline: SelectorRegistry for 4 playback modes (PR-2), bfcache event ordering log (PR-3), medalLevel visibility ratio (PR-1), live-extension competitor list (PR-4)."
+        ],
+        "rulings_dropped_due_to_apply_h_rulings_strict_mode": [
+          "R1: supersede CLAIM-001 by CON-012",
+          "R2..R12: freeze RISK-001..011 with notes: each closed by mitigation or accepted residual per g-blue alignments"
+        ]
+      }
+    },
+    "compile_for_code": null
+  }
+}

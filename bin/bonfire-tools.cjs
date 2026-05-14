@@ -71,6 +71,7 @@ function handoffValidateCommand(args) {
   const verdict = loadJSON(path.join(root, 'plan', 'h-review-verdict.json')) || null;
   const result = validateHandoff(co, { snapshot, verdict });
   if (result.valid) exitJSON({ valid: true });
+  else if (result.reentry_request) exitJSON({ valid: false, reentry_request: result.reentry_request }, 1);
   else exitError('Handoff validation failed', result.errors);
 }
 

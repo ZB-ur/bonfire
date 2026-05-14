@@ -66,7 +66,7 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
      "verdict": "<user verdict>",
      "acceptance_results": [{"check": "...", "result": "passed|failed"}],
      "followups": ["..."],
-     "failure_reason": null,
+     "failure_reason": "",
      "judged_at": "<timestamp>"
    }
    ```

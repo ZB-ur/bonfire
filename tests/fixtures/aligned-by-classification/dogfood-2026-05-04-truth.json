@@ -1,0 +1,21 @@
+{
+  "_source": "Forensic enumeration from /Users/lddmay/AiCoding/bonfire-test/gto-trainer/.bonfire/archive/2026-05-04-gto-trainer-v0.1-dogfood/truth-surface/constraint-ledger-snapshot.json",
+  "_recorded": "2026-05-06",
+  "_purpose": "Pin §3.3.2 substring rule against the 14 distinct aligned_by values from the 2026-05-04 dogfood archive. Test failure = rule drift.",
+  "tokens": [
+    {"token": "g-blue", "expected": "INCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-026", "expected": "EXCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-027", "expected": "EXCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-032", "expected": "EXCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-034", "expected": "EXCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-035", "expected": "EXCLUDE"},
+    {"token": "g-blue-mitigated-via-CON-036", "expected": "EXCLUDE"},
+    {"token": "stage-e-accept-30-as-v0.1-budget", "expected": "INCLUDE"},
+    {"token": "stage-e-accept-as-known-limitation-CON-022", "expected": "INCLUDE"},
+    {"token": "stage-e-drop-schema-version-via-CON-024", "expected": "EXCLUDE"},
+    {"token": "stage-e-mitigate-via-mixed-flag-display", "expected": "EXCLUDE"},
+    {"token": "stage-e-resolution-via-CON-023", "expected": "EXCLUDE"},
+    {"token": "stage-e-superseded-by-CON-016", "expected": "EXCLUDE"},
+    {"token": "stage-g-survival", "expected": "INCLUDE"}
+  ]
+}

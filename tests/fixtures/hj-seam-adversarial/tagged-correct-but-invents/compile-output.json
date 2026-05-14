@@ -8,8 +8,8 @@
     "domain_model": {
       "entities": {
         "DrillModel": {
-          "fields": {},
-          "notes": "user can select drill mode via monte-carlo simulator pre-scored heatmap",
+          "name": "DrillModel monte-carlo simulator pre-scored heatmap zeta alpha beta gamma delta epsilon theta iota kappa lambda sigma omega apex blaze cedar dusk flint grove haven inlet jetty knoll lunar marsh nexus orbit prism quartz ridge spiral",
+          "fields": { "drillMode": "drill mode" },
           "source_kind": "ledger_direct",
           "source_ref": "CON-003"
         }

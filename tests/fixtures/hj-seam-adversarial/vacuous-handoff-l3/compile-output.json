@@ -1,0 +1,48 @@
+{
+  "handoff": {
+    "code_ready": true,
+    "handoff_summary": "L3 vacuous-pass attack",
+    "retained_goal": "x",
+    "implementation_scope": "x",
+    "implementation_units": [{ "id": "unit-1" }],
+    "domain_model": {
+      "entities": [
+        {
+          "name": "TODO",
+          "fields": "see ledger"
+        }
+      ]
+    },
+    "function_contracts": [
+      {
+        "purpose": "...",
+        "invariants": "<TBD>",
+        "failure_modes": "TODO"
+      }
+    ],
+    "data_contract": {
+      "source_kind": "ledger_direct",
+      "source_ref": "CON-001",
+      "schema": "see ledger"
+    },
+    "ui_contract": {
+      "panels": [
+        {
+          "description": "TODO",
+          "elements": "...",
+          "states": "<placeholder>"
+        }
+      ],
+      "state_ownership": {
+        "owner_map": "TBD"
+      },
+      "empty_states": {
+        "surfaces": "TODO",
+        "messaging": "see ledger"
+      },
+      "error_states": {
+        "error_map": "placeholder"
+      }
+    }
+  }
+}

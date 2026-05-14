@@ -1,5 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "ledger_id_prefixes": ["CON", "RG", "FC", "AS", "ACC", "REQ", "RISK", "DEP", "FACT", "CLAIM", "DROP"],
+  "ledger_id_pattern": "(?:CON|RG|FC|AS|ACC|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+",
   "notes": [
     {
       "id": "overview",
@@ -171,7 +173,14 @@
     "handoff_incomplete":     { "to": "stage-h", "crosses_pipeline": false },
     "handoff_contradiction":  { "to": "stage-j", "crosses_pipeline": false },
     "invalid_stage_j_condition":   { "to": "stage-h", "crosses_pipeline": false },
-    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false }
+    "handoff_provenance_failure":  { "to": "stage-h", "crosses_pipeline": false },
+    "mandate_failure": {
+      "to": "stage-j",
+      "crosses_pipeline": false,
+      "retry_budget": 2,
+      "escalation_target_stage": "stage-h",
+      "description": "J handoff failed Layer M mandate validation — substantive_slot_refs absent or no_substantive_contract escape valve invalid"
+    }
   },
   "categories": {
     "retained_goal": {
@@ -218,13 +227,146 @@
     }
   },
   "handoff_substantive_slots": {
-    "handoff.domain_model.entities": { "_provenance_required": true, "kind": "per_entry" },
-    "handoff.function_contracts": { "_provenance_required": true, "kind": "per_entry", "fields": ["purpose", "invariants", "failure_modes"] },
-    "handoff.data_contract": { "_provenance_required": true, "kind": "whole_section" },
-    "handoff.ui_contract.panels": { "_provenance_required": true, "kind": "per_entry", "fields": ["description", "elements", "states"] },
-    "handoff.ui_contract.state_ownership": { "_provenance_required": true, "kind": "whole_section" },
-    "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section" },
-    "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section" }
+    "handoff.domain_model.entities": { "_provenance_required": true, "kind": "per_entry", "min_entries": 1, "required_subfields": ["name", "fields"] },
+    "handoff.function_contracts": { "_provenance_required": true, "kind": "per_entry", "min_entries": 1, "required_subfields": ["purpose", "invariants", "failure_modes"] },
+    "handoff.data_contract": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["schema"] },
+    "handoff.ui_contract.panels": { "_provenance_required": true, "kind": "per_entry", "min_entries": 1, "required_subfields": ["description", "elements", "states"] },
+    "handoff.ui_contract.state_ownership": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["owner_map"] },
+    "handoff.ui_contract.empty_states": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["surfaces", "messaging"] },
+    "handoff.ui_contract.error_states": { "_provenance_required": true, "kind": "whole_section", "required_subfields": ["error_map"] }
+  },
+  "verdict_substantive_check": {
+    "version": 1,
+    "applies_to": "delta_schemas.bonfire-h-review",
+    "reject_when": [
+      {
+        "rule": "approved_with_conditions_requires_conditions",
+        "predicate": {
+          "verdict": "approved_with_conditions",
+          "conditions_empty": true
+        },
+        "escape_allowed": false
+      },
+      {
+        "rule": "approved_requires_substantive_oversight_or_escape",
+        "predicate": {
+          "verdict": ["approved", "approved_with_conditions"],
+          "conditions_empty": true,
+          "rulings_empty": true
+        },
+        "escape_allowed": true
+      }
+    ],
+    "escape_valve": {
+      "flag": "no_substantive_oversight",
+      "reason_field": "no_substantive_oversight_reason",
+      "reason_ref_constraint": "ledger_ref",
+      "min_refs": 1
+    }
+  },
+  "layer_2b_calibration": {
+    "version": 1,
+    "metric_class": "max_contiguous_orphan_run",
+    "telemetry_metrics": ["overlap_ratio"],
+    "threshold_provisional": 30,
+    "threshold_status": "provisional",
+    "p75_baseline": 25,
+    "safety_margin_pct": 20,
+    "aggregation_method": "median_per_archive_p75",
+    "revisability_delta_pct": 25,
+    "min_slots_per_archive": 5,
+    "calibration_corpus_anchor": "gto-trainer-2026-05-04 N=1"
+  },
+  "stage_schemas": {
+    "_note": "Documentation-only field schemas for stage outputs. Not runtime-enforced. Authoritative for ecl-schema.md and stage-playbook.md derivation. Future assertion may extend to runtime enforcement.",
+    "version": 1,
+    "preprocess": {
+      "source": "case.json#stages.preprocess",
+      "note": "Fields written flat at top level — not nested in approval_pack sub-object",
+      "required_fields": ["reframed_goal"],
+      "array_fields": {
+        "retained_scope":       { "items": "string" },
+        "excluded_scope":       { "items": "string" },
+        "critical_assumptions": { "items": "string" },
+        "frozen_for_code":      { "items": "string" },
+        "ambiguity_points":     { "items": "string" }
+      }
+    },
+    "divergence": {
+      "source": "case.json#stages.divergence",
+      "array_fields": {
+        "options": {
+          "items": "object",
+          "item_fields": ["title", "description", "blind_spots_covered", "retained_option"]
+        }
+      }
+    },
+    "requirements": {
+      "source": "case.json#stages.requirements",
+      "array_fields": {
+        "requirement_units": {
+          "items": "object",
+          "item_fields": ["id", "title", "description", "success_criteria", "depends_on"]
+        }
+      }
+    },
+    "closure": {
+      "source": "case.json#stages.closure",
+      "array_fields": {
+        "dependency_chain": {
+          "items": "object",
+          "item_fields": ["id", "description", "upstream", "downstream"]
+        },
+        "resolved_gaps": { "items": "string" }
+      }
+    },
+    "probes": {
+      "source": "case.json#stages.probes",
+      "note": "Preventive coverage — no current drift evidence; template + playbook aligned. Lock schema to prevent future drift.",
+      "array_fields": {
+        "probes": {
+          "items": "object",
+          "item_fields": ["hypothesis", "method", "expected_signal", "kill_criteria", "result"]
+        }
+      }
+    },
+    "compile_output_companion": {
+      "note": "Inspection surfaces in compile-output.json — not alternate sources of truth. The compile-output.json itself is the authoritative artifact; these are companion sections rendered into separate markdown files.",
+      "sections": {
+        "constraint_crosswalk": {
+          "array": "mappings",
+          "item_fields": ["constraint_id", "content", "unit_ids"]
+        },
+        "execution_manifest": {
+          "array": "waves",
+          "item_fields": ["wave", "description", "units"]
+        },
+        "code_batches": {
+          "array": "batches",
+          "item_fields": ["batch_id", "description", "units"]
+        },
+        "compile_summary": {
+          "fields": ["code_ready", "summary", "blockers"]
+        },
+        "final_handoff": {
+          "fields": ["statement", "status"]
+        }
+      }
+    }
+  },
+  "handoff_mandate_params": {
+    "ref_field": "substantive_slot_refs",
+    "concrete_ref_patterns": [
+      "^FC-\\d+$",
+      "^panel:.+$"
+    ],
+    "supplementary_ref_pattern": "^(?:CON|RG|AS|REQ|RISK|DEP|FACT|CLAIM|DROP)-\\d+$",
+    "escape_valve": {
+      "flag": "no_substantive_contract",
+      "reason_field": "no_substantive_contract_reason",
+      "reason_ref_constraint": "ledger_ref",
+      "min_refs": 1
+    }
   },
   "delta_schemas": {
     "bonfire-d-critique": {
@@ -251,7 +393,33 @@
         "condition_item_shape": {
           "type": "object",
           "required_fields": ["text", "target_stage"],
-          "target_stage_enum": ["stage-j"]
+          "optional_fields": ["lexicon_exempt", "lexicon_exempt_reason"],
+          "target_stage_enum": ["stage-j"],
+          "field_substantive_check": {
+            "text": { "isEmptyOrPlaceholder": false }
+          },
+          "lexicon_exempt": {
+            "type": "boolean",
+            "description": "When true, Layer 1 skips the lexical orphan-token check for this specific condition. For use with legitimate cross-language UI copy (CJK, Arabic, Cyrillic, proper nouns, trademarks, technical IDs) that H-Review has explicitly approved. Does NOT exempt other Layer 1 checks (presence, target_stage, verb blacklist, paraphrase patterns)."
+          },
+          "lexicon_exempt_reason": {
+            "type": "string",
+            "description": "Audit trace for lexicon_exempt=true. Optional but strongly recommended. Mirrors the no_substantive_oversight_reason audit pattern."
+          }
+        },
+        "ruling_action_enum": ["freeze", "supersede"],
+        "ruling_item_shape": {
+          "type": "object",
+          "required_fields": ["action", "id"],
+          "id_constraint": "ledger_ref",
+          "action_specific_required_fields": {
+            "freeze": [],
+            "supersede": ["new_content"]
+          },
+          "field_substantive_check": {
+            "id": { "isEmptyOrPlaceholder": false },
+            "new_content": { "isEmptyOrPlaceholder": false, "applies_when_action": "supersede" }
+          }
         }
       }
     },

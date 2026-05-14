@@ -6,20 +6,26 @@ const os = require('os');
 const { validateHandoff, validateBundle } = require('../bin/lib/schema.cjs');
 
 test('validateHandoff: valid handoff passes', () => {
+  // Schema v2: data_contract requires `schema`; function_contracts requires entries with
+  // [purpose, invariants, failure_modes]; empty/missing slots skip per validateProvenance:78
+  // convention. Token coverage requires substantive tokens to overlap source.
   const handoff = {
     status: 'code_ready', code_ready: true, handoff_summary: 'OAuth2',
     retained_goal: 'Add OAuth2', implementation_scope: 'Full flow',
     repo_targets: {}, repo_grounding: {}, frozen_product_decisions: [],
     domain_model: {},
-    data_contract: { source_kind: 'ledger_direct', source_ref: 'CON-001' },
+    data_contract: { schema: 'token store', source_kind: 'ledger_direct', source_ref: 'CON-001' },
     ui_contract: {},
-    function_contracts: [], file_plan: [],
+    function_contracts: [
+      { purpose: 'token', invariants: 'token', failure_modes: 'token', source_kind: 'ledger_direct', source_ref: 'CON-001' }
+    ],
+    file_plan: [],
     implementation_units: [{ id: 'unit-1', description: 'test' }],
     verification_commands: [], browser_checks: [], acceptance_checks: [],
     allowed_decisions: [], forbidden_decisions: [],
     reentry_triggers: {}, unresolved_gaps: []
   };
-  const ctx = { snapshot: { entries: { 'CON-001': { status: 'FROZEN', content: 'x' } } } };
+  const ctx = { snapshot: { entries: { 'CON-001': { status: 'FROZEN', content: 'token store' } } } };
   assert.equal(validateHandoff({ handoff }, ctx).valid, true);
 });
 

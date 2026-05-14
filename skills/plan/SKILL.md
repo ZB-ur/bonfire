@@ -215,8 +215,10 @@ Throughout this process, `bonfire` means `node $HOME/.claude/bonfire/bin/bonfire
     ```
     Or simply: `bonfire render --all`
 
-45. Gate: handoff passes validation, code_ready=true → advance
-    - Gate failed: `state-reentry --conflict-type handoff_incomplete`, resume from stage-h
+45. Gate: parse `bonfire handoff-validate` JSON output (stdout, even on non-zero exit). Three branches:
+    - `{ valid: true }` → advance to render + code
+    - `{ valid: false, reentry_request: { conflict_type, reason } }` → `state-reentry --conflict-type <reentry_request.conflict_type>`, resume from stage-h. Skill defers conflict_type validation to the state-reentry route table (single source of truth) — pass through whatever J declared; route table rejects unregistered values.
+    - `{ error, details }` (errors-mode failure) → `state-reentry --conflict-type handoff_incomplete`, resume from stage-h
 
 46. Output: **"Planning complete. code_ready=true. Please execute /bonfire:code"**
 

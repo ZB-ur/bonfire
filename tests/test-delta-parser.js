@@ -113,3 +113,45 @@ test('bonfire-h-review: empty conditions array passes schema (Layer 1 catches em
   const result = validateDelta('bonfire-h-review', delta);
   assert.equal(result.valid, true);
 });
+
+// ---------------------------------------------------------------------------
+// field_substantive_check in condition_item_shape (3a Task 3)
+// ---------------------------------------------------------------------------
+
+test('validateDelta rejects condition with empty text (3a)', () => {
+  const delta = {
+    agent: 'bonfire-h-review',
+    verdict: 'approved_with_conditions',
+    reason: 'one condition',
+    conditions: [{ text: '', target_stage: 'stage-j' }],
+    rulings: [],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /text/.test(e)));
+});
+
+test('validateDelta rejects condition with placeholder text (3a)', () => {
+  const delta = {
+    agent: 'bonfire-h-review',
+    verdict: 'approved_with_conditions',
+    reason: 'one condition',
+    conditions: [{ text: 'see ledger', target_stage: 'stage-j' }],
+    rulings: [],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(e => /text|placeholder|see ledger/i.test(e)));
+});
+
+test('validateDelta passes condition with substantive text (3a)', () => {
+  const delta = {
+    agent: 'bonfire-h-review',
+    verdict: 'approved_with_conditions',
+    reason: 'one condition',
+    conditions: [{ text: 'J-Compile must include FC-12 in execution manifest', target_stage: 'stage-j' }],
+    rulings: [],
+  };
+  const result = validateDelta('bonfire-h-review', delta);
+  assert.equal(result.valid, true, `errors: ${result.errors.join('; ')}`);
+});

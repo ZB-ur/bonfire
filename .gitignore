@@ -1,0 +1,8 @@
+.claude/
+.playwright-mcp/
+.bonfire-calibration/
+.DS_Store
+*.swp
+*.swo
+*.log
+coverage/

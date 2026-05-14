@@ -1,0 +1,7 @@
+{
+  "agent": "bonfire-h-review",
+  "verdict": "approved_with_conditions",
+  "reason": "review complete",
+  "conditions": [{ "text": "see ledger", "target_stage": "stage-j" }],
+  "rulings": []
+}

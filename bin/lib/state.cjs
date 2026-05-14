@@ -107,6 +107,67 @@ function checkStageGInvariant() {
   }
 }
 
+/**
+ * checkVerdictSubstantive(verdict, schema, ledgerSnapshot)
+ *
+ * Per spec 2026-05-08-bonfire-assertion-3a (§6.4 + §6.6 Loc 3).
+ * Evaluates schema.verdict_substantive_check.reject_when rules against the verdict.
+ * For each matching rule: if escape_allowed and escape flag set, validates escape ref
+ * via validateLedgerRef (resolves refs + asserts >= min_refs). Otherwise rejects.
+ *
+ * Returns {valid: boolean, rule?: string, error?: string, escape_used?: string}.
+ *
+ * ARCHITECTURAL NOTE (inverse of Phase 3 IP2 choice): validateLedgerRef IS invoked
+ * here (IP3) because snapshot is in scope and the escape decision depends on resolution
+ * + FROZEN status check that only validateLedgerRef performs. This is the opposite of
+ * delta-parser.cjs IP2 which uses pattern-only check because validateDelta is stateless.
+ */
+function checkVerdictSubstantive(verdict, schema, ledgerSnapshot) {
+  const { validateLedgerRef } = require('./validation-helpers.cjs');
+  const config = schema.verdict_substantive_check;
+  if (!config) return { valid: true };  // schema not configured → pass-through
+
+  const isEmptyArr = (v) => v === undefined || (Array.isArray(v) && v.length === 0);
+  const conditionsEmpty = isEmptyArr(verdict.conditions);
+  const rulingsEmpty = isEmptyArr(verdict.rulings);
+
+  for (const rule of (config.reject_when || [])) {
+    const p = rule.predicate || {};
+    const verdictMatches = Array.isArray(p.verdict)
+      ? p.verdict.includes(verdict.verdict)
+      : p.verdict === verdict.verdict;
+    if (!verdictMatches) continue;
+    if (p.conditions_empty === true && !conditionsEmpty) continue;
+    if (p.rulings_empty === true && !rulingsEmpty) continue;
+
+    // Predicate matches. Apply escape valve if allowed.
+    if (rule.escape_allowed && config.escape_valve) {
+      const ev = config.escape_valve;
+      if (verdict[ev.flag] === true) {
+        const reason = verdict[ev.reason_field];
+        // min_refs uses ?? to preserve explicit 0 intent (though escape realistically requires >= 1)
+        const result = validateLedgerRef(reason, schema, ledgerSnapshot, ev.min_refs ?? 1);
+        if (result.valid) {
+          return { valid: true, escape_used: ev.flag };
+        }
+        return {
+          valid: false,
+          rule: rule.rule,
+          error: `escape valve ${ev.flag} invalid: ${result.error}`,
+        };
+      }
+    }
+
+    return {
+      valid: false,
+      rule: rule.rule,
+      error: `verdict matches reject_when rule "${rule.rule}"; escape ${rule.escape_allowed ? 'available but not invoked' : 'not allowed'}`,
+    };
+  }
+
+  return { valid: true };
+}
+
 function checkStageHInvariant() {
   const { loadSnapshot } = require('./truth-surface.cjs');
   const { validateDelta } = require('./delta-parser.cjs');
@@ -134,12 +195,28 @@ function checkStageHInvariant() {
     );
   }
 
-  // Load snapshot once — reused by Layer 1 below and the rulings check.
+  // Load snapshot once — reused by 3a verdict_substantive_check, Layer 1, and rulings check.
   const snapshot = loadSnapshot(dir);
   const entries = (snapshot && snapshot.entries) || {};
 
+  // 3a verdict_substantive_check — Section 6.4 of spec, runs after validateDelta
+  // and before Layer 1 (validateHConditions). Catches L0 literal-empty verdicts
+  // that pass element-level shape checks; per-element vacuousness (L1-L3) is
+  // already caught by validateDelta above.
+  const schema = loadSchema();
+  const substResult = checkVerdictSubstantive(verdict, schema, snapshot);
+  if (!substResult.valid) {
+    process.stderr.write(
+      `Cannot advance from stage-h: verdict_substantive_check rule="${substResult.rule}": ${substResult.error}\n`
+    );
+    process.stderr.write(
+      `If oversight is genuinely not needed, declare "no_substantive_oversight": true with "no_substantive_oversight_reason" containing ledger refs.\n`
+    );
+    process.exit(1);
+  }
+
   // Layer 1: condition-text invariants (blacklisted verbs, paraphrase patterns,
-  // orphan tokens). Runs after schema validation, before rulings invariant.
+  // orphan tokens). Runs after schema validation and verdict_substantive_check.
   const condResult = validateHConditions(verdict, snapshot);
   if (!condResult.valid) {
     process.stderr.write(
@@ -541,7 +618,12 @@ function stateInitCodeSteps(args) {
   const steps = {};
 
   for (let i = 0; i < units.length; i++) {
-    const stepName = `unit-${i + 1}`;
+    const unitId = units[i].id;
+    if (!unitId || !/^unit-[\w.-]+$/.test(unitId)) {
+      exitError(`stateInitCodeSteps: unit at index ${i} has invalid id="${unitId}"; ` +
+                `expected format unit-[\\w.-]+`, [], 3);
+    }
+    const stepName = unitId;
     steps[stepName] = { status: 'pending', pipeline: 'code' };
   }
 
@@ -550,7 +632,7 @@ function stateInitCodeSteps(args) {
 
   // Set current_step to first unit if not set
   if (units.length > 0 && (!state.current_step || !state.current_step.startsWith('unit-'))) {
-    state.current_step = 'unit-1';
+    state.current_step = units[0].id;
   }
 
   saveState(root, state);
@@ -568,5 +650,6 @@ module.exports = {
   stateClearReentry,
   stateBeginRun,
   stateCompleteRun,
-  stateInitCodeSteps
+  stateInitCodeSteps,
+  checkVerdictSubstantive,
 };

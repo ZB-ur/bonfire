@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Bilibili Danmaku Denoiser",
+  "version": "0.0.1",
+  "description": "Local-only Bilibili live + replay danmaku denoiser. 100% on-device. No network calls.",
+  "minimum_chrome_version": "114",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://live.bilibili.com/*",
+    "https://www.bilibili.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/sw.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://live.bilibili.com/*",
+        "https://www.bilibili.com/*"
+      ],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_title": "Bilibili Danmaku Denoiser",
+    "default_popup": "src/popup/index.html"
+  },
+  "options_ui": {
+    "page": "src/options/index.html",
+    "open_in_tab": true
+  },
+  "icons": {}
+}

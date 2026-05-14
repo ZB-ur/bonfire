@@ -131,15 +131,15 @@ test('state-advance from stage-h blocks when rulings are unsatisfied', () => {
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-UNSAT', '--category', 'retained_goal',
+      '--id', 'CON-100', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-UNSAT' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-100' }]);
 
     const result = runAdvance(dir, 'stage-h');
     assert.notEqual(result.code, 0);
     const out = result.stdout + result.stderr;
-    assert.match(out, /CON-UNSAT/);
+    assert.match(out, /CON-100/);
     assert.match(out, /expected=FROZEN/);
     assert.match(out, /actual=PROPOSED/);
     assert.match(out, /apply-h-rulings/);
@@ -153,10 +153,10 @@ test('state-advance from stage-h allows when all rulings satisfied by apply-h-ru
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-APPLIED', '--category', 'retained_goal',
+      '--id', 'CON-200', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-APPLIED' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-200' }]);
     execFileSync('node', [CLI, 'apply-h-rulings'], { encoding: 'utf8', cwd: dir });
 
     const result = runAdvance(dir, 'stage-h');
@@ -167,10 +167,30 @@ test('state-advance from stage-h allows when all rulings satisfied by apply-h-ru
 });
 
 test('state-advance from stage-h allows when verdict has empty rulings', () => {
+  // 3a: empty rulings + empty conditions requires no_substantive_oversight escape valve
+  // with a resolving ledger ref. Create a minimal FROZEN snapshot + escape verdict.
   const dir = makeTmpDir();
   try {
     setPipelineToStageH(dir);
-    writeVerdict(dir, []);
+    // Write a FROZEN snapshot entry so the escape valve ref resolves
+    const snapshotPath = path.join(dir, '.bonfire', 'truth-surface', 'constraint-ledger-snapshot.json');
+    fs.mkdirSync(path.dirname(snapshotPath), { recursive: true });
+    fs.writeFileSync(snapshotPath, JSON.stringify({
+      version: 1, replayed_at: '2026-05-09T00:00:00Z', event_count: 1,
+      entries: { 'CON-001': { id: 'CON-001', category: 'retained_goal', status: 'FROZEN', content: 'x', rationale: 'r', challenged_by: [], aligned_by: [], evidence_refs: [], notes: [] } },
+      by_status: { proposed: [], challenged: [], frozen: ['CON-001'], superseded: [], open: [], discarded: [] },
+      by_category: { retained_goal: ['CON-001'] },
+    }, null, 2));
+    // Use escape valve to satisfy 3a; rulings still empty so rulings invariant is trivial-pass
+    const verdictPath = path.join(dir, '.bonfire', 'plan', 'h-review-verdict.json');
+    fs.mkdirSync(path.dirname(verdictPath), { recursive: true });
+    fs.writeFileSync(verdictPath, JSON.stringify({
+      verdict: 'approved',
+      reason: 'test — no rulings needed',
+      rulings: [],
+      no_substantive_oversight: true,
+      no_substantive_oversight_reason: 'All entries FROZEN. See CON-001.',
+    }, null, 2));
 
     const result = runAdvance(dir, 'stage-h');
     assert.equal(result.code, 0);
@@ -184,16 +204,16 @@ test('state-advance from stage-h allows when ruling is redundant (target already
   try {
     setPipelineToStageH(dir);
     execFileSync('node', [CLI, 'truth-propose',
-      '--id', 'CON-PRE', '--category', 'retained_goal',
+      '--id', 'CON-300', '--category', 'retained_goal',
       '--content', 'x', '--rationale', 'r', '--source', 'stage-c'],
       { encoding: 'utf8', cwd: dir });
     execFileSync('node', [CLI, 'truth-update',
-      '--id', 'CON-PRE', '--field', 'aligned_by', '--value', 'stage-g-survival'],
+      '--id', 'CON-300', '--field', 'aligned_by', '--value', 'stage-g-survival'],
       { encoding: 'utf8', cwd: dir });
-    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-PRE'],
+    execFileSync('node', [CLI, 'truth-freeze', '--id', 'CON-300'],
       { encoding: 'utf8', cwd: dir });
 
-    writeVerdict(dir, [{ action: 'freeze', id: 'CON-PRE' }]);
+    writeVerdict(dir, [{ action: 'freeze', id: 'CON-300' }]);
     // No apply-h-rulings — target was already frozen by stage-g.
 
     const result = runAdvance(dir, 'stage-h');
@@ -469,6 +489,8 @@ test('E2E: clean H→J flow — valid stage-j condition, provenance handoff, all
           panels: {
             Showdown: {
               description: 'Given user placed bet When showdown occurs Then user sees winning hand',
+              elements: 'showdown',
+              states: 'showdown',
               source_kind: 'condition_rewrite',
               source_ref: { condition_index: 0 },
             },

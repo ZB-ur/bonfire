@@ -141,7 +141,7 @@ test('stage-g-freeze-gate skips all can_freeze=false categories (not just high_i
     assert.equal(result.code, 0, 'can_freeze=false entries should not cause gate failure');
 
     const snap = readSnapshot(dir);
-    assert.equal(snap.entries['CC-TWO'].status, 'CHALLENGED', 'challenged_claim status preserved');
+    assert.equal(snap.entries['CC-TWO'].status, 'PROPOSED', 'challenged_claim status preserved (PROPOSED post-3c §5.1)');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

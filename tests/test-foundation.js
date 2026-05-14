@@ -32,7 +32,13 @@ test('CLI route --list returns all conflict types', () => {
   assert.equal(result.goal_conflict.to, 'stage-a');
   assert.equal(result.goal_conflict.crosses_pipeline, true);
   assert.ok(result.requirement_conflict);
-  assert.equal(Object.keys(result).length, 11);
+  assert.equal(Object.keys(result).length, 12);
+  // mandate_failure added in ASSERTION-4 (commit 6fe93b2 + 9c1d625 shape correction)
+  assert.ok(result.mandate_failure);
+  assert.equal(result.mandate_failure.to, 'stage-j');
+  assert.equal(result.mandate_failure.crosses_pipeline, false);
+  assert.equal(result.mandate_failure.retry_budget, 2);
+  assert.equal(result.mandate_failure.escalation_target_stage, 'stage-h');
 });
 
 test('CLI route --conflict-type returns specific route', () => {
@@ -91,7 +97,7 @@ test('schema note requires reference valid ids', () => {
 test('schema has 11 reentry routes', () => {
   const { loadSchema } = require('../bin/lib/utils.cjs');
   const schema = loadSchema();
-  assert.equal(Object.keys(schema.reentry_routes).length, 11);
+  assert.equal(Object.keys(schema.reentry_routes).length, 12);
 });
 
 test('schema reentry route targets are valid steps', () => {

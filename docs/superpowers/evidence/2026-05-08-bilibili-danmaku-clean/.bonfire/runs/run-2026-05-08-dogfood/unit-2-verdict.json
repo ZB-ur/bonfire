@@ -1,0 +1,80 @@
+{
+  "agent": "bonfire-evaluator",
+  "unit_id": "unit-2",
+  "verdict": "PASS",
+  "conflict_type": null,
+  "issues": [],
+  "evidence": [
+    {
+      "check": "pnpm test (full suite)",
+      "result": "pass",
+      "detail": "15/15 tests passed (types 6, settings 7, messaging 2). Duration 196ms. vitest run, 0 failures."
+    },
+    {
+      "check": "pnpm test -- tests/shared (scoped, per unit-2 verification command)",
+      "result": "pass",
+      "detail": "15/15 tests passed in tests/shared/{types,settings,messaging}.spec.ts. Duration 199ms."
+    },
+    {
+      "check": "pnpm build",
+      "result": "pass",
+      "detail": "vite v5.2.10 built in 71ms; 11 modules transformed; manifest.json + popup/options/sw chunks emitted to dist/."
+    },
+    {
+      "check": "Required entity exports in src/shared/types.ts",
+      "result": "pass",
+      "detail": "NormalizedDanmakuRecord, NoiseVerdict, ExtensionSettings, DenoisedSessionLog, FloodWindowEntry, SelectorRegistryEntry, ProbationSnapshot all exported. Supporting unions (DanmakuRole, SourceLayer, NoiseCategory, ActionMode, CommunityPreset, PlaybackMode, AlwaysAllowEntry) also exported. tests/shared/types.spec.ts pins 13 surface symbols at compile time."
+    },
+    {
+      "check": "C5 — nullable fields use `T | null`, not `?: T`",
+      "result": "pass",
+      "detail": "NormalizedDanmakuRecord.medalLevel: number | null; .guardLevel: number | null; .uid: string | null; .role: DanmakuRole (union ending in null). Grep for `?: (string|number|boolean|DanmakuRole)` in types.ts returned zero matches. Compile-time pinned by tests/shared/types.spec.ts literal record."
+    },
+    {
+      "check": "CON-016 — NoiseVerdict.category is multi-label string[]",
+      "result": "pass",
+      "detail": "NoiseVerdict.category: NoiseCategory[]; PRIMARY_CATEGORY_LADDER exports ['toxic','ad','flood','lowinfo','offtopic'] verbatim as ReadonlyArray. Test 'PRIMARY_CATEGORY_LADDER is the CON-016 ladder verbatim' confirms order."
+    },
+    {
+      "check": "CON-007 + FPD-13 — chrome.storage.local only",
+      "result": "pass",
+      "detail": "settings.ts uses chrome.storage.local.get/set + chrome.storage.onChanged only. Grep `chrome.storage.sync` across src/ returns 2 hits — both in JSDoc comments stating 'NEVER chrome.storage.sync'. Zero non-comment usages. onSettingsChanged listener defensively filters areaName !== 'local'."
+    },
+    {
+      "check": "saveSettings emits chrome.storage.onChanged",
+      "result": "pass",
+      "detail": "Implementation: saveSettings -> writeStorageKey -> chrome.storage.local.set, which natively fires onChanged listeners (no manual emit required). Test 'saveSettings merges patch and emits chrome.storage.onChanged' subscribes via onSettingsChanged, calls saveSettings({actionMode:'fade', enabled:false}), drains microtasks, and observes the merged event payload. Cleanup test confirms unsubscribe detaches."
+    },
+    {
+      "check": "loadSettings returns defaults on first run",
+      "result": "pass",
+      "detail": "Test 'loadSettings returns defaults on first run and persists them' starts with empty mock store, calls loadSettings(), asserts actionMode='collapse' (FPD-2), enabled=true, toxicDetectorEnabled=true (CON-020), enableWsHook=false (RU-07), probationSnapshot.mode='skip' (CON-019 pre-RU-01.5). Confirms first-run write under SETTINGS_STORAGE_KEY with schemaVersion=CURRENT_SETTINGS_SCHEMA_VERSION."
+    },
+    {
+      "check": "Zero invented product semantics beyond domain_model",
+      "result": "pass",
+      "detail": "Every field in ExtensionSettings, NormalizedDanmakuRecord, NoiseVerdict, DenoisedSessionLog, FloodWindowEntry, SelectorRegistryEntry, ProbationSnapshot maps directly to compile-output.json.full handoff.domain_model.entities. The single addition — schemaVersion: number on ExtensionSettings — is explicitly required by data_contract.persistence.schema_versioning ('settings.schemaVersion: number; on mismatch, run migration'). Disclosed in manifest.deviations_from_handoff as engineering wiring, not a semantic invention."
+    },
+    {
+      "check": "FPD-4 — no fetch/XHR/WebSocket/sendBeacon to bilibili.com or non-local hosts",
+      "result": "pass",
+      "detail": "Grep across src/ for `fetch(`, `XMLHttpRequest`, `sendBeacon`, `new WebSocket`, `WebSocket(` returns zero matches. messaging.ts uses chrome.runtime.sendMessage and chrome.tabs.sendMessage exclusively — both intra-extension. No outbound network surface introduced."
+    },
+    {
+      "check": "Done-when criterion — All entity types from domain_model exported",
+      "result": "met",
+      "detail": "All 7 frozen entities exported and pinned by tests/shared/types.spec.ts."
+    },
+    {
+      "check": "Done-when criterion — loadSettings returns defaults on first run",
+      "result": "met",
+      "detail": "settings.spec.ts first-run test passes; defaults match FPD-2/CON-019/CON-020/RU-07."
+    },
+    {
+      "check": "Done-when criterion — saveSettings emits chrome.storage.onChanged",
+      "result": "met",
+      "detail": "settings.spec.ts onChanged emission test passes; cleanup unsubscribe test confirms listener lifecycle."
+    }
+  ],
+  "summary": "Unit-2 (shared types + settings) PASSES verification. All entity exports from frozen domain_model are present; C5 nullability rule is honored throughout NormalizedDanmakuRecord; CON-016 multi-label category and PRIMARY_CATEGORY_LADDER are verbatim; FPD-13 chrome.storage.local-only is enforced (zero chrome.storage.sync usages outside comments); FPD-4 no-network constraint is honored (zero fetch/XHR/WebSocket/sendBeacon usages); loadSettings/saveSettings/onSettingsChanged round-trip is mechanically verified by 7 settings tests; pnpm test (15/15) and pnpm build pass. The single non-domain-listed field (ExtensionSettings.schemaVersion) is required by data_contract.persistence.schema_versioning and disclosed in the manifest as engineering wiring — not a semantic invention. No FROZEN constraints violated, no frozen_product_decisions contradicted. No reentry signal."
+}

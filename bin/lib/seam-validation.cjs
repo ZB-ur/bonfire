@@ -212,7 +212,13 @@ function validateHConditions(verdict, snapshot) {
     }
     if (verbHit) continue;
 
-    // Rule 1: token coverage
+    // Rule 1: token coverage — skipped when lexicon_exempt is explicitly true
+    // (covers legitimate cross-language UI copy: CJK, Arabic, Cyrillic, proper
+    // nouns, trademarks, technical IDs that H-Review has explicitly approved).
+    // All other Layer 1 checks (paraphrase, verb blacklist, presence, target_stage)
+    // remain active even when lexicon_exempt=true.
+    if (cond.lexicon_exempt === true) continue;
+
     for (const rawToken of condTokens) {
       const token = lemmatizeToken(rawToken);
       if (whitelist.has(token)) continue;
@@ -240,14 +246,25 @@ function validateHConditions(verdict, snapshot) {
 function compareTokens(slotTokens, sourceText) {
   const whitelist = loadFormatWhitelist();
   const sourceTokens = extractSubstantiveTokens(sourceText || '');
+
+  // A1 (ASSERTION-4 §3.1): CON-NNN cross-reference tokens are scaffolding,
+  // not substantive content. Mask them out of BOTH source-set and slot-side
+  // before token coverage diff so they count toward neither overlap nor
+  // orphans. Pattern is /^con-\d+$/i; tokens are already lowercased by
+  // extractSubstantiveTokens, but the /i flag is kept for defensive symmetry
+  // with the spec text.
+  const isConRef = (tok) => typeof tok === 'string' && /^con-\d+$/i.test(tok);
+  const filteredSourceTokens = sourceTokens.filter(t => !isConRef(t));
+  const filteredSlotTokens = (slotTokens || []).filter(t => !isConRef(t));
+
   const sourceSet = new Set();
-  for (const t of sourceTokens) {
+  for (const t of filteredSourceTokens) {
     sourceSet.add(lemmatizeToken(t));
     sourceSet.add(t);  // also keep raw for CJK exact-match
   }
 
   const orphans = [];
-  for (const raw of slotTokens) {
+  for (const raw of filteredSlotTokens) {
     if (raw === undefined || raw === null || raw === '') continue;
     if (whitelist.has(raw)) continue;
     const lemma = lemmatizeToken(raw);
@@ -265,6 +282,85 @@ function compareTokens(slotTokens, sourceText) {
 }
 
 // ---------------------------------------------------------------------------
+// classifyAlignedByToken — §3.3.2 substring classifier
+// ---------------------------------------------------------------------------
+
+/**
+ * Spec §3.3.2 — empirical substring rule for aligned_by token classification.
+ * Used by calibration outlier exclusion (§3.3.2) and pinned by regression
+ * fixture (tests/fixtures/aligned-by-classification/dogfood-2026-05-04-truth.json).
+ *
+ * EXCLUDE iff token contains "-via-" or "-by-" substring.
+ * INCLUDE otherwise (including null, undefined, empty array).
+ *
+ * For an array of tokens, EXCLUDE if ANY single token would EXCLUDE — even
+ * one paraphrase-chain alignment makes the source ledger entry a transitive
+ * paraphrase artifact.
+ *
+ * False-positive whitelist is empty at spec freeze. Operators may add to it
+ * via calibration log review (see spec §3.3.2 calibration log enumeration).
+ */
+const ALIGNED_BY_FALSE_POSITIVE_WHITELIST = new Set([
+  // (empty — populated via calibration decisions)
+]);
+
+function classifyAlignedByToken(token) {
+  if (token == null || token === '') return 'INCLUDE';
+  if (Array.isArray(token)) {
+    if (token.length === 0) return 'INCLUDE';
+    // For an array of tokens, EXCLUDE if ANY single token would EXCLUDE
+    return token.some(t => classifyAlignedByToken(t) === 'EXCLUDE') ? 'EXCLUDE' : 'INCLUDE';
+  }
+  const s = String(token);
+  if (ALIGNED_BY_FALSE_POSITIVE_WHITELIST.has(s)) return 'INCLUDE';
+  return (s.includes('-via-') || s.includes('-by-')) ? 'EXCLUDE' : 'INCLUDE';
+}
+
+// ---------------------------------------------------------------------------
+// maxContiguousOrphanRun — Layer 2b round-4 metric (per ASSERTION-4 round-4
+// spec §5). Computes the longest contiguous run of orphan tokens in slot
+// (i.e., tokens NOT present in source content tokens), preserving slot
+// token order. CON-* refs reset the current run (breaks contiguous orphan
+// sequence) per spec §5 pseudocode. Round-4 primary reject_when metric.
+//
+// Orphan = slot token not in extractSubstantiveTokens(sourceText) bag.
+//
+// Per spec §5 (raw comparison; NOT lemmatization): membership check uses
+// raw extractSubstantiveTokens output without lemma stemming. This anchors
+// to Stage 0 calibration baseline (gto-trainer 9-slot corpus computed
+// without lemma; CON-036 max_run=35 per docs/superpowers/evidence/
+// 2026-05-10-round-4-data/gto-trainer-distribution.json). compareTokens
+// (PR #2 Layer 2b foundation) applies lemmatization for binary
+// orphans-presence reject; round-4's threshold metric uses raw to preserve
+// Stage 0 calibration validity. Spec amendment required if future evidence
+// shows lemma-aware metric improves discrimination (per Q5 §6.4 trigger).
+// ---------------------------------------------------------------------------
+function maxContiguousOrphanRun(slotTokens, sourceText) {
+  const sourceTokens = extractSubstantiveTokens(sourceText || '');
+  const sourceSet = new Set(sourceTokens);
+  let maxRun = 0;
+  let currentRun = 0;
+  for (const raw of (slotTokens || [])) {
+    const tok = (raw || '').toString().toLowerCase();
+    if (/^con-\d+$/i.test(tok)) {
+      // CON-* refs: reset current run per spec §5 pseudocode (orphan_run = 0;
+      // continue). Equivalent to a "gap" in the slot token sequence — CON-*
+      // is scaffolding, not orphan content, so it terminates any preceding
+      // orphan run.
+      currentRun = 0;
+      continue;
+    }
+    if (sourceSet.has(tok)) {
+      currentRun = 0;
+    } else {
+      currentRun += 1;
+      if (currentRun > maxRun) maxRun = currentRun;
+    }
+  }
+  return maxRun;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -277,4 +373,7 @@ module.exports = {
   PARAPHRASE_PATTERNS,
   validateHConditions,
   compareTokens,
+  maxContiguousOrphanRun,
+  classifyAlignedByToken,
+  ALIGNED_BY_FALSE_POSITIVE_WHITELIST,
 };

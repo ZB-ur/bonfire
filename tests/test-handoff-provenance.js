@@ -37,11 +37,13 @@ test('validateHandoff: slot not listed in whitelist passes without source fields
 });
 
 test('validateHandoff: domain_model.entities with valid ledger_direct passes', () => {
+  // Schema v2: required_subfields=["name","fields"] for entities; both must be substantive.
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
-          fields: {},
+          name: 'Card model',
+          fields: 'rank suit',
           source_kind: 'ledger_direct',
           source_ref: 'CON-013',
         },
@@ -49,7 +51,7 @@ test('validateHandoff: domain_model.entities with valid ledger_direct passes', (
     },
   });
   const ctx = mkContext({
-    snapshot: { entries: { 'CON-013': { status: 'FROZEN', content: 'card model' } } },
+    snapshot: { entries: { 'CON-013': { status: 'FROZEN', content: 'card model with rank and suit' } } },
   });
   const result = validateHandoff(co, ctx);
   assert.equal(result.valid, true, `errors: ${JSON.stringify(result.errors)}`);
@@ -94,11 +96,13 @@ test('validateHandoff: entities missing source_ref fails', () => {
 });
 
 test('validateHandoff: source_kind=condition_rewrite with valid condition_index passes', () => {
+  // Schema v2: name+fields substantive. Tokens must overlap condition text for Layer 2b.
   const co = mkCompileOutput({
     domain_model: {
       entities: {
         Card: {
-          fields: {},
+          name: 'Card reformat given when then',
+          fields: 'reformat',
           source_kind: 'condition_rewrite',
           source_ref: { condition_index: 0, verdict_path: '.bonfire/plan/h-review-verdict.json' },
         },
@@ -141,15 +145,16 @@ test('validateHandoff: condition_rewrite with out-of-range index fails', () => {
 });
 
 test('validateHandoff: whole_section slot (data_contract) validates at section root', () => {
+  // Schema v2: data_contract.required_subfields=["schema"]. Aligned with v2.
   const co = mkCompileOutput({
     data_contract: {
-      persistence_mechanism: 'localStorage',
+      schema: 'localStorage based key-value store',
       source_kind: 'ledger_direct',
       source_ref: 'CON-015',
     },
   });
   const ctx = mkContext({
-    snapshot: { entries: { 'CON-015': { status: 'FROZEN', content: 'localStorage only' } } },
+    snapshot: { entries: { 'CON-015': { status: 'FROZEN', content: 'localStorage based key-value store' } } },
   });
   const result = validateHandoff(co, ctx);
   assert.equal(result.valid, true, `errors: ${JSON.stringify(result.errors)}`);

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "replayed_at": "2026-05-09T00:00:00Z",
+  "event_count": 1,
+  "entries": {
+    "CON-001": {
+      "id": "CON-001",
+      "category": "retained_goal",
+      "status": "FROZEN",
+      "content": "Converged",
+      "rationale": "fixture",
+      "challenged_by": ["fixture"],
+      "aligned_by": ["fixture"],
+      "evidence_refs": [],
+      "notes": []
+    }
+  },
+  "by_status": { "proposed": [], "challenged": [], "frozen": ["CON-001"], "superseded": [], "open": [], "discarded": [] },
+  "by_category": { "retained_goal": ["CON-001"] }
+}
